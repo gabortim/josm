@@ -17,7 +17,6 @@ jobs:
     env:
       LANG: en_US.UTF-8
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       josm_revision: ${{ steps.create_revision.outputs.josm_revision }}
       josm_prerelease: ${{ steps.create_revision.outputs.josm_prerelease }}
       josm_release_tag: ${{ steps.create_revision.outputs.josm_release_tag }}
@@ -45,19 +44,6 @@ jobs:
           echo "josm_revision=$josm_revision" >> $GITHUB_OUTPUT
           echo "josm_release_tag=$josm_release_tag" >> $GITHUB_ENV
           echo "josm_release_tag=$josm_release_tag" >> $GITHUB_OUTPUT
-
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ env.josm_release_tag }}
-          release_name: JOSM release ${{ env.josm_release_tag }}
-          body: |
-            JOSM release ${{ env.josm_release_tag }}
-          draft: false
-          prerelease: ${{ env.josm_prerelease }}
 
   build:
     needs: createrelease
