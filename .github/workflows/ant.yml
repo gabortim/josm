@@ -88,7 +88,7 @@ jobs:
           else
             ANT="ant -Dreleasebuild=true"
           fi
-          $ANT dis
+          $ANT dist
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
