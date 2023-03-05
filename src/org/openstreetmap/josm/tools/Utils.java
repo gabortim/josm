@@ -81,6 +81,7 @@ public final class Utils {
     private static final long MILLIS_OF_MINUTE = TimeUnit.MINUTES.toMillis(1);
     private static final long MILLIS_OF_HOUR = TimeUnit.HOURS.toMillis(1);
     private static final long MILLIS_OF_DAY = TimeUnit.DAYS.toMillis(1);
+    private static final int[][] EMPTY_INT_INT_ARRAY = new int[0][];
 
     /**
      * A list of all characters allowed in URLs
@@ -226,7 +227,7 @@ public final class Utils {
         if (array != null) {
             return Arrays.copyOf(array, array.length);
         }
-        return null;
+        return array;
     }
 
     /**
@@ -239,7 +240,7 @@ public final class Utils {
         if (array != null) {
             return Arrays.copyOf(array, array.length);
         }
-        return null;
+        return array;
     }
 
     /**
@@ -252,7 +253,7 @@ public final class Utils {
         if (array != null) {
             return Arrays.copyOf(array, array.length);
         }
-        return null;
+        return array;
     }
 
     /**
@@ -265,7 +266,7 @@ public final class Utils {
         if (array != null) {
             return Arrays.copyOf(array, array.length);
         }
-        return null;
+        return array;
     }
 
     /**
@@ -486,7 +487,7 @@ public final class Utils {
      * @return MD5 hash of data, string of length 32 with characters in range [0-9a-f]
      */
     public static String md5Hex(String data) {
-        MessageDigest md = null;
+        MessageDigest md;
         try {
             md = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
@@ -1308,7 +1309,7 @@ public final class Utils {
      * @param values an array of values
      * @return standard deviation of the given array, or -1.0 if the array has less than two values
      * @see #getStandardDeviation(double[], double)
-     * @since xxx
+     * @since 18553
      */
     public static double getStandardDeviation(double[] values) {
         return getStandardDeviation(values, Double.NaN);
@@ -1321,7 +1322,7 @@ public final class Utils {
      * @param mean precalculated average value of the array
      * @return standard deviation of the given array, or -1.0 if the array has less than two values
      * @see #getStandardDeviation(double[])
-     * @since xxx
+     * @since 18553
      */
     public static double getStandardDeviation(double[] values, double mean) {
         if (values.length < 2) {
@@ -1339,6 +1340,38 @@ public final class Utils {
         }
 
         return Math.sqrt(standardDeviation / values.length);
+    }
+
+    /**
+     * Group a list of integers, mostly useful to avoid calling many selection change events
+     * for a logical interval.
+     * <br>
+     * Example: {@code groupIntegers(1, 2, 3, 5, 6, 7, 8, 9)} becomes {@code [[1, 3], [5, 9]]}
+     * @param integers The integers to group
+     * @return The integers grouped into logical blocks, [lower, higher] (inclusive)
+     * @since 18556
+     */
+    public static int[][] groupIntegers(int... integers) {
+        if (integers.length == 0) {
+            return EMPTY_INT_INT_ARRAY;
+        }
+        List<int[]> groups = new ArrayList<>();
+        int[] current = {Integer.MIN_VALUE, Integer.MIN_VALUE};
+        groups.add(current);
+        for (int row : integers) {
+            if (current[0] == Integer.MIN_VALUE) {
+                current[0] = row;
+                current[1] = row;
+                continue;
+            }
+            if (current[1] == row - 1) {
+                current[1] = row;
+            } else {
+                current = new int[] {row, row};
+                groups.add(current);
+            }
+        }
+        return groups.toArray(EMPTY_INT_INT_ARRAY);
     }
 
     /**
@@ -1742,7 +1775,7 @@ public final class Utils {
      */
     public static Date getJavaExpirationDate() {
         try {
-            Object value = null;
+            Object value;
             Class<?> c = Class.forName("com.sun.deploy.config.BuiltInProperties");
             try {
                 value = c.getDeclaredField("JRE_EXPIRATION_DATE").get(null);
@@ -1772,9 +1805,15 @@ public final class Utils {
                             "java.baseline.version.url",
                             Config.getUrls().getJOSMWebsite() + "/remote/oracle-java-update-baseline.version")))
                     .connect().fetchContent().split("\n", -1);
-            if (getJavaVersion() <= 8) {
+            if (getJavaVersion() <= 11 && isRunningWebStart()) { // OpenWebStart currently only has Java 11
                 for (String version : versions) {
-                    if (version.startsWith("1.8")) {
+                    if (version.startsWith("11")) {
+                        return version;
+                    }
+                }
+            } else if (getJavaVersion() <= 17) {
+                for (String version : versions) {
+                    if (version.startsWith("17")) { // Use current Java LTS
                         return version;
                     }
                 }

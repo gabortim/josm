@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import javax.swing.JOptionPane;
@@ -42,6 +43,8 @@ import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.WaySegment;
 import org.openstreetmap.josm.data.osm.visitor.AllNodesVisitor;
 import org.openstreetmap.josm.data.osm.visitor.paint.WireframeMapRenderer;
+import org.openstreetmap.josm.data.preferences.BooleanProperty;
+import org.openstreetmap.josm.data.preferences.CachingProperty;
 import org.openstreetmap.josm.gui.ExtendedDialog;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.MapFrame;
@@ -131,6 +134,10 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         }
     }
 
+    /** Whether nodes should be merged with other primitives by default when they are being dragged */
+    private static final CachingProperty<Boolean> MERGE_BY_DEFAULT
+            = new BooleanProperty("edit.move.merge-by-default", false).cached();
+
     private boolean lassoMode;
     private boolean repeatedKeySwitchLassoOption;
 
@@ -188,7 +195,7 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
      * to remove the highlight from them again as otherwise the whole data
      * set would have to be checked.
      */
-    private transient Optional<OsmPrimitive> currentHighlight = Optional.empty();
+    private transient OsmPrimitive currentHighlight;
 
     /**
      * Create a new SelectAction
@@ -269,8 +276,6 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         updateKeyModifiersEx(modifiers);
         determineMapMode(c.isPresent());
 
-        Optional<OsmPrimitive> newHighlight = Optional.empty();
-
         virtualManager.clear();
         if (mode == Mode.MOVE && !dragInProgress() && virtualManager.activateVirtualNodeNearPoint(e.getPoint())) {
             DataSet ds = getLayerManager().getActiveDataSet();
@@ -279,22 +284,23 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
             }
             mv.setNewCursor(SelectActionCursor.virtual_node.cursor(), this);
             // don't highlight anything else if a virtual node will be
-            return repaintIfRequired(newHighlight);
+            return repaintIfRequired(null);
         }
 
         mv.setNewCursor(getCursor(c.orElse(null)), this);
 
         // return early if there can't be any highlights
         if (!drawTargetHighlight || (mode != Mode.MOVE && mode != Mode.SELECT) || !c.isPresent())
-            return repaintIfRequired(newHighlight);
+            return repaintIfRequired(null);
 
         // CTRL toggles selection, but if while dragging CTRL means merge
         final boolean isToggleMode = platformMenuShortcutKeyMask && !dragInProgress();
-        if (c.isPresent() && (isToggleMode || !c.get().isSelected())) {
+        OsmPrimitive newHighlight = null;
+        if (isToggleMode || !c.get().isSelected()) {
             // only highlight primitives that will change the selection
             // when clicked. I.e. don't highlight selected elements unless
             // we are in toggle mode.
-            newHighlight = c;
+            newHighlight = c.get();
         }
         return repaintIfRequired(newHighlight);
     }
@@ -319,7 +325,7 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
             if (dragInProgress()) {
                 // only consider merge if ctrl is pressed and there are nodes in
                 // the selection that could be merged
-                if (!platformMenuShortcutKeyMask || getLayerManager().getEditDataSet().getSelectedNodes().isEmpty()) {
+                if (!isMergeRequested() || getLayerManager().getEditDataSet().getSelectedNodes().isEmpty()) {
                     c = "move";
                     break;
                 }
@@ -370,20 +376,23 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
             needsRepaint = true;
             ds.clearHighlightedVirtualNodes();
         }
-        if (!currentHighlight.isPresent()) {
+        if (currentHighlight == null) {
             return needsRepaint;
-        } else {
-            currentHighlight.get().setHighlighted(false);
         }
-        currentHighlight = Optional.empty();
+        currentHighlight.setHighlighted(false);
+        currentHighlight = null;
         return true;
     }
 
-    private boolean repaintIfRequired(Optional<OsmPrimitive> newHighlight) {
-        if (!drawTargetHighlight || currentHighlight.equals(newHighlight))
+    private boolean repaintIfRequired(OsmPrimitive newHighlight) {
+        if (!drawTargetHighlight || Objects.equals(currentHighlight, newHighlight))
             return false;
-        currentHighlight.ifPresent(osm -> osm.setHighlighted(false));
-        newHighlight.ifPresent(osm -> osm.setHighlighted(true));
+        if (currentHighlight != null) {
+            currentHighlight.setHighlighted(false);
+        }
+        if (newHighlight != null) {
+            newHighlight.setHighlighted(true);
+        }
         currentHighlight = newHighlight;
         return true;
     }
@@ -496,6 +505,8 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         if (mouseDownButton == MouseEvent.BUTTON1 && mouseReleaseTime > mouseDownTime)
             return;
 
+        updateKeyModifiers(e);
+
         cancelDrawMode = true;
         if (mode == Mode.SELECT) {
             // Unregisters selectionManager if ctrl has been pressed after mouse click on Mac OS X in order to move the map
@@ -519,12 +530,12 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         if (mode == Mode.MOVE) {
             // If ctrl is pressed we are in merge mode. Look for a nearby node,
             // highlight it and adjust the cursor accordingly.
-            final boolean canMerge = platformMenuShortcutKeyMask && !getLayerManager().getEditDataSet().getSelectedNodes().isEmpty();
+            final boolean canMerge = isMergeRequested() && !getLayerManager().getEditDataSet().getSelectedNodes().isEmpty();
             final OsmPrimitive p = canMerge ? findNodeToMergeTo(e.getPoint()) : null;
             boolean needsRepaint = removeHighlighting();
             if (p != null) {
                 p.setHighlighted(true);
-                currentHighlight = Optional.of(p);
+                currentHighlight = p;
                 needsRepaint = true;
             }
             mv.setNewCursor(getCursor(p), this);
@@ -891,11 +902,14 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         } else {
             // if small number of elements were moved,
             updateKeyModifiers(e);
-            if (platformMenuShortcutKeyMask) mergePrims(e.getPoint());
+            if (isMergeRequested()) mergePrims(e.getPoint());
         }
     }
 
     static void checkCommandForLargeDistance(Command lastCommand) {
+        if (lastCommand == null) {
+            return;
+        }
         final int moveCount = lastCommand.getParticipatingPrimitives().size();
         if (lastCommand instanceof MoveCommand) {
             final double moveDistance = ((MoveCommand) lastCommand).getDistance(n -> !n.isNew());
@@ -938,6 +952,14 @@ public class SelectAction extends MapMode implements ModifierExListener, KeyPres
         return elementsToTest.stream()
                 .flatMap(n -> n.referrers(Way.class))
                 .anyMatch(Way::isDisabledAndHidden);
+    }
+
+    /**
+     * Check if dragged node should be merged when moving it over another primitive
+     * @return true if merge is requested
+     */
+    private boolean isMergeRequested() {
+        return MERGE_BY_DEFAULT.get() ^ platformMenuShortcutKeyMask;
     }
 
     /**

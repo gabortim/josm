@@ -444,7 +444,10 @@ public class TaggingPreset extends AbstractAction implements ActiveLayerChangeLi
             GuiHelper.setEnabledRec(itemPanel, false);
         }
 
-        if (selected.size() == 1 && USE_VALIDATOR.get()) {
+        if (selected.size() == 1 && Boolean.TRUE.equals(USE_VALIDATOR.get())) {
+            // Fail early -- validateAsync requires the primitive(s) to be part of a dataset. Failing later in validateAsync ''does not'' give us
+            // a usable stack trace. See #21829 for details.
+            selected.forEach(OsmPrimitive::checkDataset);
             itemGuiSupport.addListener((source, key, newValue) ->
                     TaggingPresetValidation.validateAsync(selected.iterator().next(), validationLabel, getChangedTags()));
         }
@@ -467,7 +470,13 @@ public class TaggingPreset extends AbstractAction implements ActiveLayerChangeLi
      * @return {@code true} if a dialog can be shown for this preset
      */
     public boolean isShowable() {
-        return data.stream().anyMatch(i -> !(i instanceof Optional || i instanceof Space || i instanceof Key));
+        // Not using streams makes this method effectively allocation free and uses ~40% fewer CPU cycles.
+        for (TaggingPresetItem i : data) {
+            if (!(i instanceof Optional || i instanceof Space || i instanceof Key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

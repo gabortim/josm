@@ -1034,7 +1034,9 @@ way[cycleway:right=lane]::core_cycleway {
     set laneRight;
 }
 way[oneway=no][cycleway=lane]::core_cycleway,
-way[!oneway][cycleway=lane]::core_cycleway {
+way[!oneway][cycleway=lane]::core_cycleway,
+way[cycleway:both=lane]::core_cycleway,
+way[oneway?][oneway:bicycle=no][cycleway=lane]::core_cycleway {
     set laneLeft;
     set laneRight;
 }
@@ -1061,7 +1063,9 @@ way[cycleway:right=shared_lane]::core_cycleway {
     set shared_laneRight;
 }
 way[oneway=no][cycleway=shared_lane]::core_cycleway,
-way[!oneway][cycleway=shared_lane]::core_cycleway {
+way[!oneway][cycleway=shared_lane]::core_cycleway,
+way[oneway?][oneway:bicycle=no][cycleway=shared_lane]::core_cycleway,
+way[cycleway:both=shared_lane]::core_cycleway {
     set shared_laneLeft;
     set shared_laneRight;
 }
@@ -1092,7 +1096,9 @@ way[cycleway:right=track]::core_cycleway {
     set trackRight;
 }
 way[oneway=no][cycleway=track]::core_cycleway,
-way[!oneway][cycleway=track]::core_cycleway {
+way[!oneway][cycleway=track]::core_cycleway,
+way[oneway?][oneway:bicycle=no][cycleway=track]::core_cycleway,
+way[cycleway:both=track]::core_cycleway {
     set trackLeft;
     set trackRight;
 }
@@ -3198,6 +3204,7 @@ node[amenity=fountain] {
     set icon_z17;
 }
 area[amenity=animal_boarding],
+area[amenity=animal_breeding],
 area[amenity=place_of_worship],
 area[amenity=monastery],
 area[amenity=grave_yard],
@@ -3215,6 +3222,10 @@ area[amenity=driving_school] {
 }
 node[amenity=animal_boarding] {
     icon-image: "presets/accommodation/animal_boarding.svg";
+    set icon_z17;
+}
+node[amenity=animal_breeding] {
+    icon-image: "presets/misc/animal_breeding.svg";
     set icon_z17;
 }
 node[amenity=place_of_worship] {
@@ -4016,7 +4027,7 @@ area[landuse=orchard] {
     fill-color: green#b1e0c2;
 }
 area[landuse=quarry] {
-    fill-color: quarry#888888;
+    fill-color: quarry#a6945b;
 }
 area[landuse=landfill] {
     fill-color: landfill#663300;
@@ -4075,7 +4086,7 @@ area[landuse=greenfield] {
     fill-color: greenfield#b1ec5c;
 }
 area[landuse=railway] {
-    fill-color: railland#888888;
+    fill-color: railland#80654e;
 }
 area[landuse=construction] {
     fill-color: construction#ffff00;
@@ -4744,8 +4755,12 @@ node[sport=athletics] {
     icon-image: "presets/sport/athletics.svg";
     set icon_z17;
 }
-area[sport=running] {
+area[sport=running]:closed {
     fill-color: sport_running#cfebd8;
+}
+way[sport=running] {
+    width: 2;
+    color: sport_running#cfebd8;
 }
 node[sport=running] {
     icon-image: "presets/sport/running.svg";
@@ -4941,6 +4956,10 @@ node[natural=cliff] {
     icon-image: "presets/misc/cliff.svg";
     set icon_z17;
 }
+way[natural=arete] {
+    width: 1;
+    color: arete#e6e6e6;
+}
 way[natural=ridge] {
     width: 1;
     color: natural#002f00;
@@ -5116,6 +5135,7 @@ node[natural=beach],
 node[natural=sand],
 node[natural=land],
 node[natural=bare_rock],
+node[natural=arete],
 node[natural=ridge],
 node[natural=valley] {
     icon-image: "presets/misc/deprecated.svg";

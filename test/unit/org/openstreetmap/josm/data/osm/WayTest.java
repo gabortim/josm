@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -48,9 +49,9 @@ class WayTest {
         ds.addPrimitive(n4);
         Way way = new Way(1);
         assertFalse(way.getBBox().isValid());
-        way.setNodes(Arrays.asList(n1));
+        way.setNodes(Collections.singletonList(n1));
         assertFalse(way.getBBox().isValid());
-        way.setNodes(Arrays.asList(n2));
+        way.setNodes(Collections.singletonList(n2));
         assertTrue(way.getBBox().isValid());
         way.setNodes(Arrays.asList(n1, n2));
         assertTrue(way.getBBox().isValid());
@@ -115,7 +116,7 @@ class WayTest {
         way.removeNodes(new HashSet<>(Arrays.asList(n3, n4)));
         assertEquals(Arrays.asList(n1, n2, n1), way.getNodes());
         way.setNodes(Arrays.asList(n1, n2, n3, n4, n1));
-        way.removeNodes(new HashSet<>(Arrays.asList(n1)));
+        way.removeNodes(new HashSet<>(Collections.singletonList(n1)));
         assertEquals(Arrays.asList(n2, n3, n4, n2), way.getNodes());
     }
 

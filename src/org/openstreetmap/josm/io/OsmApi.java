@@ -12,6 +12,9 @@ import java.net.Authenticator.RequestorType;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.NoRouteToHostException;
+import java.net.PortUnreachableException;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +29,8 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.notes.Note;
+import org.openstreetmap.josm.data.oauth.OAuthAccessTokenHolder;
+import org.openstreetmap.josm.data.oauth.OAuthVersion;
 import org.openstreetmap.josm.data.osm.Changeset;
 import org.openstreetmap.josm.data.osm.IPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
@@ -79,6 +84,8 @@ public class OsmApi extends OsmConnection {
     private static final Map<String, OsmApi> instances = new HashMap<>();
 
     private static final ListenerList<OsmApiInitializationListener> listeners = ListenerList.create();
+    /** This is used to make certain we have set osm-server.auth-method to the "right" default */
+    private static boolean oauthCompatibilitySwitch;
 
     private URL url;
 
@@ -642,7 +649,44 @@ public class OsmApi extends OsmConnection {
      * @since 6349
      */
     public static boolean isUsingOAuth() {
-        return "oauth".equals(getAuthMethod());
+        return isUsingOAuth(OAuthVersion.OAuth10a)
+                || isUsingOAuth(OAuthVersion.OAuth20)
+                || isUsingOAuth(OAuthVersion.OAuth21);
+    }
+
+    /**
+     * Determines if JOSM is configured to access OSM API via OAuth
+     * @param version The OAuth version
+     * @return {@code true} if JOSM is configured to access OSM API via OAuth, {@code false} otherwise
+     * @since 18650
+     */
+    public static boolean isUsingOAuth(OAuthVersion version) {
+        if (version == OAuthVersion.OAuth10a) {
+            return "oauth".equalsIgnoreCase(getAuthMethod());
+        } else if (version == OAuthVersion.OAuth20 || version == OAuthVersion.OAuth21) {
+            return "oauth20".equalsIgnoreCase(getAuthMethod());
+        }
+        return false;
+    }
+
+    /**
+     * Ensure that OAuth is set up
+     * @param api The api for which we need OAuth keys
+     * @return {@code true} if we are using OAuth and there are keys for the specified API
+     */
+    public static boolean isUsingOAuthAndOAuthSetUp(OsmApi api) {
+        if (OsmApi.isUsingOAuth()) {
+            if (OsmApi.isUsingOAuth(OAuthVersion.OAuth10a)) {
+                return OAuthAccessTokenHolder.getInstance().containsAccessToken();
+            }
+            if (OsmApi.isUsingOAuth(OAuthVersion.OAuth20)) {
+                return OAuthAccessTokenHolder.getInstance().getAccessToken(api.getBaseUrl(), OAuthVersion.OAuth20) != null;
+            }
+            if (OsmApi.isUsingOAuth(OAuthVersion.OAuth21)) {
+                return OAuthAccessTokenHolder.getInstance().getAccessToken(api.getBaseUrl(), OAuthVersion.OAuth21) != null;
+            }
+        }
+        return false;
     }
 
     /**
@@ -650,7 +694,25 @@ public class OsmApi extends OsmConnection {
      * @return the authentication method
      */
     public static String getAuthMethod() {
-        return Config.getPref().get("osm-server.auth-method", "oauth");
+        setCurrentAuthMethod();
+        return Config.getPref().get("osm-server.auth-method", "oauth20");
+    }
+
+    /**
+     * This is a compatibility method for users who currently use OAuth 1.0 -- we are changing the default from oauth to oauth20,
+     * but since oauth was the default, pre-existing users will suddenly be switched to oauth20.
+     * This should be removed whenever {@link OAuthVersion#OAuth10a} support is removed.
+     */
+    private static void setCurrentAuthMethod() {
+        if (!oauthCompatibilitySwitch) {
+            oauthCompatibilitySwitch = true;
+            final String prefKey = "osm-server.auth-method";
+            if ("oauth20".equals(Config.getPref().get(prefKey, "oauth20"))
+                && !isUsingOAuthAndOAuthSetUp(OsmApi.getOsmApi())
+                && OAuthAccessTokenHolder.getInstance().containsAccessToken()) {
+                Config.getPref().put(prefKey, "oauth");
+            }
+        }
     }
 
     protected final String sendPostRequest(String urlSuffix, String requestBody, ProgressMonitor monitor) throws OsmTransferException {
@@ -768,8 +830,18 @@ public class OsmApi extends OsmConnection {
                 default:
                     throw new OsmApiException(retCode, errorHeader, errorBody);
                 }
-            } catch (SocketTimeoutException | ConnectException e) {
-                if (retries-- > 0) {
+            } catch (SocketException | SocketTimeoutException e) {
+                /*
+                 * See #22160. While it is only thrown once in JDK sources, it does have subclasses.
+                 * We check for those first, the explicit non-child exception, and then for the message.
+                 */
+                boolean validException = e instanceof SocketTimeoutException
+                        || e instanceof ConnectException
+                        || e instanceof NoRouteToHostException
+                        || e instanceof PortUnreachableException
+                        || (e.getClass().equals(SocketException.class) &&
+                            "Unexpected end of file from server".equals(e.getMessage()));
+                if (retries-- > 0 && validException) {
                     continue;
                 }
                 throw new OsmTransferException(e);

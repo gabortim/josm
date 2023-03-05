@@ -1,30 +1,28 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.gui.layer.markerlayer;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.File;
 import java.net.MalformedURLException;
-import java.net.URL;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.openstreetmap.josm.JOSMFixture;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.gpx.GpxData;
 import org.openstreetmap.josm.data.gpx.WayPoint;
+import org.openstreetmap.josm.testutils.JOSMTestRules;
+import org.openstreetmap.josm.testutils.annotations.BasicPreferences;
 
 /**
  * Unit tests of {@link ImageMarker} class.
  */
+@BasicPreferences
 class ImageMarkerTest {
-
-    /**
-     * Setup tests
-     */
-    @BeforeAll
-    public static void setUpBeforeClass() {
-        JOSMFixture.createUnitTestFixture().init();
-    }
+    @RegisterExtension
+    static JOSMTestRules josmTestRules = new JOSMTestRules().main();
 
     /**
      * Unit test of {@link ImageMarker#ImageMarker}.
@@ -34,12 +32,25 @@ class ImageMarkerTest {
     void testImageMarker() throws MalformedURLException {
         ImageMarker marker = new ImageMarker(
                 LatLon.ZERO,
-                new URL("file://something.jpg"),
+                new File(TestUtils.getRegressionDataFile(12255, "G0016941.JPG")).toURI().toURL(),
                 new MarkerLayer(new GpxData(), null, null, null),
                 1d, 2d);
         marker.actionPerformed(null);
         assertEquals("", marker.getText());
         WayPoint wpt = marker.convertToWayPoint();
         assertEquals(LatLon.ZERO, wpt.getCoor());
+    }
+
+    /**
+     * Non-regression test for #22638: NoSuchFileException causes a crash
+     */
+    @Test
+    void testTicket22638() throws MalformedURLException {
+        ImageMarker marker = new ImageMarker(
+                LatLon.ZERO,
+                new File(TestUtils.getRegressionDataFile(12255, "no_such.jpg")).toURI().toURL(),
+                new MarkerLayer(new GpxData(), null, null, null),
+                1d, 2d);
+        assertDoesNotThrow(() -> marker.actionPerformed(null));
     }
 }

@@ -16,7 +16,7 @@
          xmlns:unless="ant:unless"
 >
     <target name="init-ivy" description="Initialize dependency management system Apache Ivy">
-        <property name="ivy.version" value="2.5.0"/>
+        <property name="ivy.version" value="2.5.1"/>
         <dirname property="base.dir" file="${ant.file.josm}"/>
         <property name="lib.dir"   location="${base.dir}/lib"/>
         <property name="tools.dir" location="${base.dir}/tools"/>
@@ -414,6 +414,9 @@ Build-Date: ${build.tstamp}
                     <cp-elements/>
                 </classpath>
             </javac>
+            <copy todir="${test.dir}/build/@{testfamily}/META-INF">
+              <fileset dir="${test.dir}/data/META-INF"/>
+            </copy>
         </sequential>
     </macrodef>
     <target name="test-compile" depends="test-init,compile,extract-libraries,epsg,copy-resources" description="Compile all tests">

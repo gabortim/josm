@@ -313,7 +313,6 @@ public final class DomainValidator extends AbstractValidator {
         "accountants", // accountants Knob Town, LLC
         "aco", // aco ACO Severin Ahlmann GmbH &amp; Co. KG
         "actor", // actor United TLD Holdco Ltd.
-        "adac", // adac Allgemeiner Deutscher Automobil-Club e.V. (ADAC)
         "ads", // ads Charleston Road Registry Inc.
         "adult", // adult ICM Registry AD LLC
         "aeg", // aeg Aktiebolaget Electrolux
@@ -441,7 +440,6 @@ public final class DomainValidator extends AbstractValidator {
         "broker", // broker DOTBROKER REGISTRY LTD
         "brother", // brother Brother Industries, Ltd.
         "brussels", // brussels DNS.be vzw
-        "bugatti", // bugatti Bugatti International SA
         "build", // build Plan Bee LLC
         "builders", // builders Atomic Madison, LLC
         "business", // business Spring Cross, LLC
@@ -456,7 +454,6 @@ public final class DomainValidator extends AbstractValidator {
         "cam", // cam AC Webconnecting Holding B.V.
         "camera", // camera Atomic Maple, LLC
         "camp", // camp Delta Dynamite, LLC
-        "cancerresearch", // cancerresearch Australian Cancer Research Foundation
         "canon", // canon Canon Inc.
         "capetown", // capetown ZA Central Registry NPC trading as ZA Central Registry
         "capital", // capital Delta Mill, LLC
@@ -891,7 +888,6 @@ public final class DomainValidator extends AbstractValidator {
         "loans", // loans June Woods, LLC
         "locker", // locker Dish DBS Corporation
         "locus", // locus Locus Analytics LLC
-        "loft", // loft Annco, Inc.
         "lol", // lol Uniregistry, Corp.
         "london", // london Dot London Domains Limited
         "lotte", // lotte Lotte Holdings Co., Ltd.
@@ -1162,7 +1158,6 @@ public final class DomainValidator extends AbstractValidator {
         "select", // select iSelect Ltd
         "sener", // sener Sener Ingeniería y Sistemas, S.A.
         "services", // services Fox Castle, LLC
-        "ses", // ses SES
         "seven", // seven Seven West Media Ltd
         "sew", // sew SEW-EURODRIVE GmbH &amp; Co KG
         "sex", // sex ICM Registry SX LLC
@@ -1426,7 +1421,6 @@ public final class DomainValidator extends AbstractValidator {
         "xn--io0a7i", // 网络 Computer Network Information Center of Chinese Academy of Sciences （China Internet Network Information Center）
         "xn--j1aef", // ком VeriSign Sarl
         "xn--jlq480n2rg", // 亚马逊 Amazon Registry Services, Inc.
-        "xn--jlq61u9w7b", // 诺基亚 Nokia Corporation
         "xn--jvr189m", // 食品 Amazon Registry Services, Inc.
         "xn--kcrx77d1x4a", // 飞利浦 Koninklijke Philips N.V.
         "xn--kput3i", // 手机 Beijing RITT-Net Technology Development Co., Ltd

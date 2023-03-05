@@ -321,7 +321,7 @@ way[class] {
   throwWarning: tr("{0} is unspecific. Instead use the key fixme with the information what exactly should be fixed in the value of fixme.", "{0.tag}");
 }
 
-/* #10107, #10108, #10929, #13391 - http://wiki.openstreetmap.org/wiki/Proposed_features/leaftype#Features.2FPages_affected */
+/* #10107, #10108, #10929, #13391, #22336 - http://wiki.openstreetmap.org/wiki/Proposed_features/leaftype#Features.2FPages_affected */
 *[type=broad_leaved],
 *[type=broad_leafed] {
   throwWarning: tr("{0} is deprecated", "{0.tag}");
@@ -354,18 +354,14 @@ way[class] {
   fixRemove: "{0.key}";
   fixAdd: "leaf_cycle=evergreen";
 }
+*[wood=deciduous],
 *[type=deciduous],
 *[type=deciduos] {
   throwWarning: tr("{0} is deprecated", "{0.tag}");
   suggestAlternative: "leaf_cycle=deciduous";
   group: tr("deprecated tagging");
-  fixRemove: "type";
+  fixRemove: "{0.key}";
   fixAdd: "leaf_cycle=deciduous";
-}
-*[wood=deciduous] {
-  throwWarning: tr("{0} is deprecated", "{0.tag}");
-  suggestAlternative: "leaf_type + leaf_cycle";
-  group: tr("deprecated tagging");
 }
 node[type=palm],
 way[type=palm] {
@@ -444,7 +440,8 @@ way[type=palm] {
   fixAdd: "park_ride=yes";
 }
 
-/* #19287, #18334, #17950, #10661, #10837, #11737, #12771, #21009 */
+/* #19287, #18334, #17950, #10661, #10837, #11737, #12771, #21009, #22379 */
+*[parking=yes],
 *[playground=yes],
 *[manhole=plain],
 *[manhole=unknown],
@@ -514,6 +511,19 @@ way[sidewalk=yes] {
 }
 *[levels]!.levels_building {
   throwWarning: tr("Unusual key {0}, maybe {1} or {2} is meant", "{0.key}", "level", "building:levels");
+}
+
+/* #22481 */
+*[building:level][!building:levels] {
+  throwWarning: tr("{0} is deprecated", "{0.key}");
+  suggestAlternative: "building:levels";
+  group: tr("deprecated tagging");
+  fixChangeKey: "building:level => building:levels";
+}
+*[building:level][building:levels] {
+  throwWarning: tr("{0} is deprecated", "{0.key}");
+  suggestAlternative: "building:levels";
+  group: tr("deprecated tagging");
 }
 
 /* #10691 */
@@ -707,18 +717,12 @@ relation[/^..$/][!to] {
   fixAdd: "sport=billiards";
 }
 
-/* #11499, #16928 */
-*[payment:credit_cards=yes] {
-  throwOther: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:mastercard=yes", "payment:visa=yes");
-}
-*[payment:debit_cards=yes] {
-  throwWarning: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:maestro=yes", "payment:girocard=yes");
-}
+/* #11499, #16928, #22367 */
 *[payment:electronic_purses=yes] {
-  throwWarning: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:ep_geldkarte=yes", "payment:ep_quick=yes");
+  throwOther: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:ep_geldkarte=yes", "payment:ep_quick=yes");
 }
 *[payment:cryptocurrencies=yes] {
-  throwWarning: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:bitcoin=yes", "payment:litecoin=yes");
+  throwOther: tr("{0} is inaccurate. Use separate tags for each specific type, e.g. {1} or {2}.", "{0.tag}", "payment:bitcoin=yes", "payment:litecoin=yes");
 }
 
 /* #16253 */
@@ -2049,8 +2053,8 @@ way[highway][construction=yes][highway!=construction] {
   group: tr("deprecated tagging");
 }
 
-/* #18659 */
-*[car][amenity=charging_station] {
+/* #18659, #20539 */
+*[car] {
   throwWarning: tr("{0} is deprecated", "{0.key}");
   suggestAlternative: "motorcar";
   group: tr("deprecated tagging");
@@ -2085,6 +2089,39 @@ node[exit_to] {
   throwWarning: tr("{0} is deprecated", "{0.tag}");
   suggestAlternative: "natural=water + water=river";
   group: tr("deprecated tagging");
+}
+
+/* #21630 */
+*[waterway=riverbank][!natural][!water],
+*[waterway=riverbank][natural=water][!water],
+*[waterway=riverbank][!natural][water=river],
+*[waterway=riverbank][natural=water][water=river] {
+  throwWarning: tr("{0} is deprecated", "{0.tag}");
+  suggestAlternative: "natural=water + water=river";
+  group: tr("deprecated tagging");
+  fixAdd: "natural=water";
+  fixAdd: "water=river";
+  fixRemove: "waterway";
+  assertMatch: "way waterway=riverbank";
+  assertMatch: "way waterway=riverbank natural=water";
+  assertMatch: "way waterway=riverbank water=river";
+  assertMatch: "way waterway=riverbank natural=water water=river";
+  assertNoMatch: "way waterway=riverbank natural=shingle";
+  assertNoMatch: "way waterway=riverbank water=lake";
+  assertNoMatch: "way waterway=riverbank natural=water water=lake";
+  assertNoMatch: "way waterway=riverbank natural=shingle water=river";
+}
+*[waterway=riverbank][natural][natural!=water],
+*[waterway=riverbank][water][water!=river] {
+  throwWarning: tr("{0} is deprecated", "{0.tag}");
+  suggestAlternative: "natural=water + water=river";
+  group: tr("deprecated tagging");
+  assertMatch: "way waterway=riverbank natural=shingle";
+  assertMatch: "way waterway=riverbank water=lake";
+  assertNoMatch: "way waterway=riverbank";
+  assertNoMatch: "way waterway=riverbank natural=water";
+  assertNoMatch: "way waterway=riverbank water=river";
+  assertNoMatch: "way waterway=riverbank natural=water water=river";
 }
 
 node[amenity=bench][capacity][!seats],
@@ -2338,6 +2375,60 @@ way[shoulder=none] {
 *[role] {
   throwWarning: tr("{0} as a tag on an object. Roles are specified in the relation members list instead.", "{0.tag}", "{0.key}");
   assertMatch: "node role=stop";
+}
+
+/* #22120 */
+*[school=entrance] {
+  throwWarning: tr("{0} is deprecated", "{0.tag}");
+  suggestAlternative: "entrance=yes";
+  suggestAlternative: "entrance=main";
+  group: tr("deprecated tagging");
+}
+
+/* #21836 */
+*[voltage-high],
+*[voltage-low] {
+  throwWarning: tr("{0} is deprecated", "{0.key}");
+  suggestAlternative: "voltage:primary";
+  suggestAlternative: "voltage:secondary";
+  group: tr("deprecated tagging");
+}
+
+/* #22335 */
+*[toilet][!toilets] {
+  throwWarning: tr("{0} is deprecated", "{0.key}");
+  suggestAlternative: "toilets";
+  group: tr("deprecated tagging");
+  fixChangeKey: "toilet => toilets";
+}
+*[toilet][toilets] {
+  throwWarning: tr("{0} is deprecated", "{0.key}");
+  suggestAlternative: "toilets";
+  group: tr("deprecated tagging");
+}
+
+/* Replaced by type=connectivity */
+*[type="turnlanes:turns"] {
+  throwWarning: tr("{0} is deprecated", "{0.tag}");
+  suggestAlternative: "type=connectivity";
+  group: tr("deprecated tagging");
+}
+
+/* temporary URLs, can be extended to other websites and other keys e.g. "url" or "website", #22397 */
+*[image][image=~/^https:\/\/westnordost.de\/p\//] {
+  throwWarning: tr("{0} with a temporary URL which may be outdated very soon", "{0.key}");
+  fixRemove: "{0.key}";
+  assertMatch: "node image=https://westnordost.de/p/17484.jpg";
+  assertNoMatch: "node image=https://web.archive.org/web/20220623215400/https://westnordost.de/p/97331.jpg";
+  assertNoMatch: "node image=https://commons.wikimedia.org/wiki/File:2015-05-13_Basteibr%C3%BCcke-.jpg";
+}
+
+/* Replaced by archaeological_site, see #22561 */
+*[historic=archaeological_site][site_type] {
+  throwWarning: tr("{0} should be replaced with {1}", "{1.key}", "archaeological_site");
+  fixChangeKey: "site_type => archaeological_site";
+  assertMatch: "node historic=archaeological_site site_type=fortification";
+  assertNoMatch: "node historic=archaeological_site site_type2=fortification";
 }
 
 /* When tags are deprecated they should be added to ignoretags.cfg too. */

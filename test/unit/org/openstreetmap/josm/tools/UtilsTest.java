@@ -127,7 +127,7 @@ class UtilsTest {
      */
     @Test
     void testPositionListString() {
-        assertEquals("1", Utils.getPositionListString(Arrays.asList(1)));
+        assertEquals("1", Utils.getPositionListString(Collections.singletonList(1)));
         assertEquals("1-2", Utils.getPositionListString(Arrays.asList(1, 2)));
         assertEquals("1-3", Utils.getPositionListString(Arrays.asList(1, 2, 3)));
         assertEquals("1-3", Utils.getPositionListString(Arrays.asList(3, 1, 2)));

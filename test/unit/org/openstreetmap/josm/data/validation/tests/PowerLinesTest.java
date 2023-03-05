@@ -1,29 +1,36 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.data.validation.tests;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openstreetmap.josm.JOSMFixture;
+import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
+import org.openstreetmap.josm.data.osm.Relation;
+import org.openstreetmap.josm.data.osm.RelationMember;
 import org.openstreetmap.josm.data.osm.TagMap;
 import org.openstreetmap.josm.data.osm.Way;
-import org.openstreetmap.josm.gui.MainApplication;
-import org.openstreetmap.josm.gui.layer.OsmDataLayer;
+import org.openstreetmap.josm.testutils.annotations.BasicPreferences;
+import org.openstreetmap.josm.testutils.annotations.Projection;
 
-public class PowerLinesTest {
+/**
+ * Test class for {@link PowerLines}
+ * @since 18553
+ */
+@BasicPreferences
+@Projection
+class PowerLinesTest {
     private PowerLines powerLines;
     private DataSet ds;
 
     @BeforeEach
     public void setUp() throws Exception {
-        JOSMFixture.createUnitTestFixture().init();
         ds = new DataSet();
-        MainApplication.getLayerManager().addLayer(new OsmDataLayer(ds, null, null));
 
         powerLines = new PowerLines();
         powerLines.initialize();
@@ -111,5 +118,15 @@ public class PowerLinesTest {
         powerLines.visit(powerline);
         powerLines.endTest();
         assertFalse(powerLines.getErrors().isEmpty());
+    }
+
+    /**
+     * Ensure that incomplete relations don't cause problems
+     */
+    @Test
+    void testNonRegression22684() {
+        final Relation powerLine = TestUtils.newRelation("natural=water water=river",
+                new RelationMember("", TestUtils.newWay("", new Node(), new Node())));
+        assertDoesNotThrow(() -> this.powerLines.visit(powerLine));
     }
 }

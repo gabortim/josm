@@ -4,17 +4,20 @@ package org.openstreetmap.josm.io;
 import static org.openstreetmap.josm.tools.I18n.tr;
 
 import java.io.InputStream;
+import java.net.SocketException;
 import java.util.Collection;
 import java.util.Map.Entry;
 
 import javax.json.Json;
 import javax.json.JsonArray;
+import javax.json.JsonException;
 import javax.json.JsonNumber;
 import javax.json.JsonObject;
 import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.stream.JsonParser;
 import javax.json.stream.JsonParser.Event;
+import javax.json.stream.JsonParsingException;
 
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.PrimitiveData;
@@ -178,10 +181,21 @@ public class OsmJsonReader extends AbstractReader {
 
     @Override
     protected DataSet doParseDataSet(InputStream source, ProgressMonitor progressMonitor) throws IllegalDataException {
-        return doParseDataSet(source, progressMonitor, ir -> {
-            setParser(Json.createParser(ir));
-            parse();
-        });
+        try {
+            return doParseDataSet(source, progressMonitor, ir -> {
+                setParser(Json.createParser(ir));
+                parse();
+            });
+        } catch (JsonParsingException exception) {
+            throw new IllegalDataException(exception);
+        } catch (JsonException exception) {
+            if (exception.getCause() instanceof SocketException) {
+                SocketException soe = (SocketException) exception.getCause();
+                soe.addSuppressed(exception); // Add the caught exception as a suppressed exception
+                throw new IllegalDataException(soe); // NOPMD -- PreserveStackTrace should be fixed with PMD 7
+            }
+            throw exception;
+        }
     }
 
     /**

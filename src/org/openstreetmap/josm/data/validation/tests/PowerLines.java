@@ -1,19 +1,21 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.data.validation.tests;
 
-import static org.openstreetmap.josm.gui.MainApplication.getLayerManager;
 import static org.openstreetmap.josm.tools.I18n.tr;
 
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.openstreetmap.josm.data.coor.EastNorth;
+import org.openstreetmap.josm.data.coor.ILatLon;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
 import org.openstreetmap.josm.data.osm.Relation;
@@ -31,7 +33,6 @@ import org.openstreetmap.josm.gui.progress.ProgressMonitor;
 import org.openstreetmap.josm.spi.preferences.Config;
 import org.openstreetmap.josm.tools.Geometry;
 import org.openstreetmap.josm.tools.Logging;
-import org.openstreetmap.josm.tools.Pair;
 import org.openstreetmap.josm.tools.Utils;
 
 /**
@@ -45,6 +46,10 @@ import org.openstreetmap.josm.tools.Utils;
  * See #7812 and #20716 for discussions about this test.
  */
 public class PowerLines extends Test {
+    // Common strings
+    private static final String MINOR_LINE = "minor_line";
+    private static final String BUILDING = "building";
+    private static final String POWER = "power";
 
     // Test identifiers
     protected static final int POWER_SUPPORT = 2501;
@@ -55,21 +60,21 @@ public class PowerLines extends Test {
     protected static final int POWER_LINE_TYPE = 2506;
 
     protected static final String PREFIX = ValidatorPrefHelper.PREFIX + "." + PowerLines.class.getSimpleName();
-    private double hillyCompensation;
-    private double hillyThreshold;
 
     /** Values for {@code power} key interpreted as power lines */
-    static final Collection<String> POWER_LINE_TAGS = Arrays.asList("line", "minor_line");
+    static final Collection<String> POWER_LINE_TAGS = Arrays.asList("line", MINOR_LINE);
     /** Values for {@code power} key interpreted as power towers */
     static final Collection<String> POWER_TOWER_TAGS = Arrays.asList("catenary_mast", "pole", "portal", "tower");
     /** Values for {@code power} key interpreted as power stations */
     static final Collection<String> POWER_STATION_TAGS = Arrays.asList("generator", "plant", "substation");
     /** Values for {@code building} key interpreted as power stations */
-    static final Collection<String> BUILDING_STATION_TAGS = Arrays.asList("transformer_tower");
+    static final Collection<String> BUILDING_STATION_TAGS = Collections.singletonList("transformer_tower");
     /** Values for {@code power} key interpreted as allowed power items */
     static final Collection<String> POWER_INFRASTRUCTURE_TAGS = Arrays.asList("compensator", "connection", "converter",
             "generator", "insulator", "switch", "switchgear", "terminal", "transformer");
 
+    private double hillyCompensation;
+    private double hillyThreshold;
     private final Set<Node> badConnections = new HashSet<>();
     private final Set<Node> missingTags = new HashSet<>();
     private final Set<Way> wrongLineType = new HashSet<>();
@@ -79,7 +84,9 @@ public class PowerLines extends Test {
     private final List<Set<Node>> segmentRefDiscontinuities = new ArrayList<>();
     private final List<OsmPrimitive> powerStations = new ArrayList<>();
 
-    private final Collection<Way> datasetWaterways = new HashSet<>(32);
+    private final Collection<Way> foundPowerLines = new HashSet<>();
+    /** All waterway segments, grouped by cells */
+    private final Map<Point2D, List<WaySegment>> cellSegmentsWater = new HashMap<>(32);
 
     /**
      * Constructs a new {@code PowerLines} test.
@@ -89,22 +96,12 @@ public class PowerLines extends Test {
                 "for nodes in power lines that do not have a power=tower/pole tag"));
     }
 
-    /** Power line support features ref=* numbering direction. */
-    private enum NumberingDirection {
-        /** No direction */
-        NONE,
-        /** Numbering follows way direction */
-        SAME,
-        /** Numbering goes opposite way direction */
-        OPPOSITE
-    }
-
     @Override
     public void visit(Node n) {
         boolean nodeInLineOrCable = false;
         boolean connectedToUnrelated = false;
         for (Way parent : n.getParentWays()) {
-            if (parent.hasTag("power", "line", "minor_line", "cable"))
+            if (parent.hasTag(POWER, "line", MINOR_LINE, "cable"))
                 nodeInLineOrCable = true;
             else if (!isRelatedToPower(parent))
                 connectedToUnrelated = true;
@@ -117,80 +114,28 @@ public class PowerLines extends Test {
     public void visit(Way w) {
         if (!isPrimitiveUsable(w)) return;
 
-        if (isPowerLine(w) && !w.hasKey("line") && !w.hasTag("location", "underground")) {
-            final int segmentCount = w.getNodesCount() - 1;
-            final double mean = w.getLength() / segmentCount;
-            final double stdDev = Utils.getStandardDeviation(w.getSegmentLengths(), mean);
-            final boolean isContinuesAsMinorLine = isContinuesAsMinorLine(w);
-            boolean isCrossingWater = false;
-            int poleCount = 0;
-            int towerCount = 0;
-            Node prevNode = w.firstNode();
-
-            double baseThreshold = w.hasTag("power", "line") ? 1.6 : 1.8;
-            if (mean / stdDev < hillyThreshold) {
-                //compensate for possibly hilly areas where towers can't be put anywhere
-                baseThreshold += hillyCompensation;
-            }
-
-            for (int i = 0; i < w.getRealNodesCount(); i++) {
-                final Node n = w.getNode(i);
-
-                /// handle power station line connections (e.g. power=line + line=*)
-                if (isConnectedToStationLine(n, w) || n.hasTag("power", "connection")) {
-                    prevNode = n;
-                    continue;   // skip, it would be false positive
-                }
-
-                /// handle missing power line support tags (e.g. tower)
-                if (!isPowerTower(n) && !isPowerInfrastructure(n) && IN_DOWNLOADED_AREA.test(n)
-                        && (!w.isFirstLastNode(n) || !isPowerStation(n)))
-                    missingTags.add(n);
-
-                /// handle missing nodes
-                double segmentLen = n.greatCircleDistance(prevNode);
-                final Pair<Node, Node> pair = Pair.create(prevNode, n);
-                final Set<Way> crossingWaterWays = new HashSet<>(8);
-                final Set<Node> crossingPositions = new HashSet<>(8);
-                findCrossings(datasetWaterways, w, pair, crossingWaterWays, crossingPositions);
-
-                if (!crossingWaterWays.isEmpty()) {
-                    double compensation = calculateIntersectingLen(prevNode, crossingPositions);
-                    segmentLen -= compensation;
-                }
-
-                if (segmentCount > 4
-                        && segmentLen > mean * baseThreshold
-                        && !isPowerInfrastructure(n)
-                        && IN_DOWNLOADED_AREA.test(n))
-                    missingNodes.add(WaySegment.forNodePair(w, prevNode, n));
-
-                /// handle wrong line types
-                if (!crossingWaterWays.isEmpty())
-                    isCrossingWater = true;
-
-                if (n.hasTag("power", "pole"))
-                    poleCount++;
-                else if (n.hasTag("power", "tower", "portal"))
-                    towerCount++;
-
-                prevNode = n;
-            }
-
-            /// handle ref=* numbering discontinuities
-            if (detectDiscontinuity(w, refDiscontinuities, segmentRefDiscontinuities))
-                refDiscontinuities.add(w);
-
-            /// handle wrong line types
-            if (((poleCount > towerCount && w.hasTag("power", "line"))
-                    || (poleCount < towerCount && w.hasTag("power", "minor_line")
-                    && !isCrossingWater
-                    && !isContinuesAsMinorLine))
-                    && IN_DOWNLOADED_AREA.test(w))
-                wrongLineType.add(w);
-
+        if (isPowerLine(w) && !w.hasKey("line") && !w.hasTag("location", "underground") && w.isUsable()) {
+            foundPowerLines.add(w);
         } else if (w.isClosed() && isPowerStation(w)) {
             powerStations.add(w);
+        } else if (concernsWaterArea(w)) {
+            this.addWaterWaySegments(w);
+        }
+    }
+
+    /**
+     * Add segments to the appropriate cells
+     * @param w The way to add segments from
+     */
+    private void addWaterWaySegments(Way w) {
+        for (int i = 0; i < w.getNodesCount() - 1; i++) {
+            final WaySegment es1 = new WaySegment(w, i);
+            final Node first = es1.getFirstNode();
+            final Node second = es1.getSecondNode();
+
+            if (first.isLatLonKnown() && second.isLatLonKnown()) {
+                CrossingWays.getSegments(this.cellSegmentsWater, first, second).forEach(list -> list.add(es1));
+            }
         }
     }
 
@@ -198,30 +143,25 @@ public class PowerLines extends Test {
     public void visit(Relation r) {
         if (r.isMultipolygon() && isPowerStation(r)) {
             powerStations.add(r);
+        } else if (concernsWaterArea(r)) {
+            r.getMemberPrimitives(Way.class).forEach(this::addWaterWaySegments);
         }
     }
 
     @Override
     public void startTest(ProgressMonitor progressMonitor) {
         super.startTest(progressMonitor);
-        // the test run can take a bit of time, show detailed progress
-        setShowElements(true);
-
         hillyCompensation = Config.getPref().getDouble(PREFIX + ".hilly_compensation", 0.2);
         hillyThreshold = Config.getPref().getDouble(PREFIX + ".hilly_threshold", 4.0);
-
-        // collect all waterways
-        getLayerManager()
-                .getActiveDataSet()
-                .getWays()
-                .parallelStream()
-                .filter(way -> way.isUsable() && (concernsWaterArea(way)
-                        || way.referrers(Relation.class).anyMatch(PowerLines::concernsWaterArea)))
-                .forEach(datasetWaterways::add);
     }
 
     @Override
     public void endTest() {
+        // Do the actual checks
+        for (Way w : this.foundPowerLines) {
+            powerlineChecks(w);
+        }
+        // Then return the errors
         for (Node n : missingTags) {
             if (!isInPowerStation(n)) {
                 errors.add(TestError.builder(this, Severity.WARNING, POWER_SUPPORT)
@@ -284,18 +224,95 @@ public class PowerLines extends Test {
     }
 
     /**
+     * The base powerline checks
+     * @param w The powerline to check
+     */
+    private void powerlineChecks(Way w) {
+        final int segmentCount = w.getNodesCount() - 1;
+        final double mean = w.getLength() / segmentCount;
+        final double stdDev = Utils.getStandardDeviation(w.getSegmentLengths(), mean);
+        final boolean isContinuesAsMinorLine = isContinuesAsMinorLine(w);
+        boolean isCrossingWater = false;
+        int poleCount = 0;
+        int towerCount = 0;
+        Node prevNode = w.firstNode();
+
+        double baseThreshold = w.hasTag(POWER, "line") ? 1.6 : 1.8;
+        if (mean / stdDev < hillyThreshold) {
+            //compensate for possibly hilly areas where towers can't be put anywhere
+            baseThreshold += hillyCompensation;
+        }
+
+        for (Node n : w.getNodes()) {
+
+            /// handle power station line connections (e.g. power=line + line=*)
+            if (isConnectedToStationLine(n, w) || n.hasTag(POWER, "connection")) {
+                prevNode = n;
+                continue;   // skip, it would be false positive
+            }
+
+            /// handle missing power line support tags (e.g. tower)
+            if (!isPowerTower(n) && !isPowerInfrastructure(n) && IN_DOWNLOADED_AREA.test(n)
+                    && (!w.isFirstLastNode(n) || !isPowerStation(n)))
+                missingTags.add(n);
+
+            /// handle missing nodes
+            double segmentLen = n.greatCircleDistance(prevNode);
+            final Set<Way> crossingWaterWays = new HashSet<>(8);
+            final Set<ILatLon> crossingPositions = new HashSet<>(8);
+            findCrossings(this.cellSegmentsWater, w, crossingWaterWays, crossingPositions);
+
+            if (!crossingWaterWays.isEmpty()) {
+                double compensation = calculateIntersectingLen(prevNode, crossingPositions);
+                segmentLen -= compensation;
+            }
+
+            if (segmentCount > 4
+                    && segmentLen > mean * baseThreshold
+                    && !isPowerInfrastructure(n)
+                    && IN_DOWNLOADED_AREA.test(n))
+                missingNodes.add(WaySegment.forNodePair(w, prevNode, n));
+
+            /// handle wrong line types
+            if (!crossingWaterWays.isEmpty())
+                isCrossingWater = true;
+
+            if (n.hasTag(POWER, "pole"))
+                poleCount++;
+            else if (n.hasTag(POWER, "tower", "portal"))
+                towerCount++;
+
+            prevNode = n;
+        }
+
+        /// handle ref=* numbering discontinuities
+        if (detectDiscontinuity(w, refDiscontinuities, segmentRefDiscontinuities))
+            refDiscontinuities.add(w);
+
+        /// handle wrong line types
+        if (((poleCount > towerCount && w.hasTag(POWER, "line"))
+                || (poleCount < towerCount && w.hasTag(POWER, MINOR_LINE)
+                && !isCrossingWater
+                && !isContinuesAsMinorLine))
+                && IN_DOWNLOADED_AREA.test(w))
+            wrongLineType.add(w);
+
+    }
+
+    /**
      * The summarized length (in metres) of a way where a power line hangs over a water area.
      * @param ref Reference point
      * @param crossingNodes Crossing nodes, unordered
      * @return The summarized length (in metres) of a way where a power line hangs over a water area
      */
-    private static double calculateIntersectingLen(Node ref, Set<Node> crossingNodes) {
+    private static double calculateIntersectingLen(Node ref, Set<ILatLon> crossingNodes) {
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
 
-        for (Node n : crossingNodes) {
-            if (ref != null && ref.isLatLonKnown() && n != null && n.isLatLonKnown()) {
-                double dist = ref.greatCircleDistance(n);
+        for (ILatLon coor : crossingNodes) {
+
+            if (ref != null && coor != null) {
+                double dist = ref.greatCircleDistance(coor);
 
                 if (dist < min)
                     min = dist;
@@ -308,30 +325,44 @@ public class PowerLines extends Test {
 
     /**
      * Searches for way intersections, which intersect the {@code pair} attribute.
-     * @param ways collection of ways to search
-     * @param parent parent way for {@code pair} param
-     * @param pair node pair among which search for another way
+     * @param ways collection of ways to search for crossings
+     * @param parent parent powerline way to find crossings for
      * @param crossingWays found crossing ways
      * @param crossingPositions collection of the crossing positions
      * @implNote Inspired by {@code utilsplugin2/selection/NodeWayUtils.java#addWaysIntersectingWay()}
      */
-    private static void findCrossings(Collection<Way> ways, Way parent, Pair<Node, Node> pair, Set<Way> crossingWays,
-                                      Set<Node> crossingPositions) {
-        for (Way way : ways) {
-            if (way.isUsable()
-                    && !crossingWays.contains(way)
-                    && way.getBBox().intersects(parent.getBBox())) {
-                for (Pair<Node, Node> pair2 : way.getNodePairs(false)) {
-                    EastNorth eastNorth = Geometry.getSegmentSegmentIntersection(
-                            pair.a.getEastNorth(), pair.b.getEastNorth(),
-                            pair2.a.getEastNorth(), pair2.b.getEastNorth());
-                    if (eastNorth != null) {
-                        crossingPositions.add(new Node(eastNorth));
-                        crossingWays.add(way);
+    private static void findCrossings(Map<Point2D, List<WaySegment>> ways, Way parent, Set<Way> crossingWays,
+                                      Set<ILatLon> crossingPositions) {
+        int nodesSize = parent.getNodesCount();
+        for (int i = 0; i < nodesSize - 1; i++) {
+            final WaySegment es1 = new WaySegment(parent, i);
+            if (!es1.getFirstNode().isLatLonKnown() || !es1.getSecondNode().isLatLonKnown()) {
+                Logging.warn("PowerLines crossing ways test section skipped " + es1);
+                continue;
+            }
+            for (List<WaySegment> segments : CrossingWays.getSegments(ways, es1.getFirstNode(), es1.getSecondNode())) {
+                for (WaySegment segment : segments) {
+                    if (es1.intersects(segment)) {
+                        final ILatLon ll = Geometry.getSegmentSegmentIntersection(es1.getFirstNode(), es1.getSecondNode(),
+                                segment.getFirstNode(), segment.getSecondNode());
+                        if (ll != null) {
+                            crossingWays.add(es1.getWay());
+                            crossingPositions.add(ll);
+                        }
                     }
                 }
             }
         }
+    }
+
+    /** Power line support features ref=* numbering direction. */
+    private enum NumberingDirection {
+        /** No direction */
+        NONE,
+        /** Numbering follows way direction */
+        SAME,
+        /** Numbering goes opposite way direction */
+        OPPOSITE
     }
 
     /** Helper class for reference numbering test. Used for storing continuous reference segment info. */
@@ -464,7 +495,7 @@ public class PowerLines extends Test {
                 // ref change: number -> null
                 segments.add(new SegmentInfo(startIndex, index - 1 - startIndex, previousRef, direction));
                 direction = NumberingDirection.NONE;    // to fix directionality
-            } else if (previousRef != null && ref != null) {
+            } else if (previousRef != null) {
                 // ref change: number -> number
                 if (Math.abs(ref - previousRef) != 1) {
                     segments.add(new SegmentInfo(startIndex, index - 1 - startIndex, previousRef, direction));
@@ -545,10 +576,10 @@ public class PowerLines extends Test {
     }
 
     private static boolean isRelatedToPower(Way way) {
-        if (way.hasTag("power") || way.hasTag("building"))
+        if (way.hasTag(POWER) || way.hasTag(BUILDING))
             return true;
         for (OsmPrimitive ref : way.getReferrers()) {
-            if (ref instanceof Relation && ref.isMultipolygon() && (ref.hasTag("power") || ref.hasTag("building"))) {
+            if (ref instanceof Relation && ref.isMultipolygon() && (ref.hasTag(POWER) || ref.hasTag(BUILDING))) {
                 for (RelationMember rm : ((Relation) ref).getMembers()) {
                     if (way == rm.getMember())
                         return true;
@@ -588,7 +619,7 @@ public class PowerLines extends Test {
      * @return {@code true} if the given primitive denotes a power=minor_line
      */
     private static boolean isMinorLine(OsmPrimitive p) {
-        return p.hasTag("power", "minor_line");
+        return p.hasTag(POWER, MINOR_LINE);
     }
 
     /**
@@ -632,7 +663,7 @@ public class PowerLines extends Test {
      * @param w The way to be tested
      * @return {@code true} if power key is set and equal to line/minor_line
      */
-    protected static final boolean isPowerLine(Way w) {
+    protected static boolean isPowerLine(Way w) {
         return isPowerIn(w, POWER_LINE_TAGS);
     }
 
@@ -641,7 +672,7 @@ public class PowerLines extends Test {
      * @param p The primitive to be tested
      * @return {@code true} if power key is set and equal to generator/substation/plant
      */
-    protected static final boolean isPowerStation(OsmPrimitive p) {
+    protected static boolean isPowerStation(OsmPrimitive p) {
         return isPowerIn(p, POWER_STATION_TAGS) || isBuildingIn(p, BUILDING_STATION_TAGS);
     }
 
@@ -650,7 +681,7 @@ public class PowerLines extends Test {
      * @param n The node to be tested
      * @return {@code true} if power key is set and equal to pole/tower/portal/catenary_mast
      */
-    protected static final boolean isPowerTower(Node n) {
+    protected static boolean isPowerTower(Node n) {
         return isPowerIn(n, POWER_TOWER_TAGS);
     }
 
@@ -660,7 +691,7 @@ public class PowerLines extends Test {
      * @return {@code true} if power key is set and equal to compensator/converter/generator/insulator
      * /switch/switchgear/terminal/transformer
      */
-    protected static final boolean isPowerInfrastructure(Node n) {
+    protected static boolean isPowerInfrastructure(Node n) {
         return isPowerIn(n, POWER_INFRASTRUCTURE_TAGS);
     }
 
@@ -671,7 +702,7 @@ public class PowerLines extends Test {
      * @return {@code true} if power key is set and equal to possible values
      */
     private static boolean isPowerIn(OsmPrimitive p, Collection<String> values) {
-        return p.hasTag("power", values);
+        return p.hasTag(POWER, values);
     }
 
     /**
@@ -681,19 +712,20 @@ public class PowerLines extends Test {
      * @return {@code true} if power key is set and equal to possible values
      */
     private static boolean isBuildingIn(OsmPrimitive p, Collection<String> values) {
-        return p.hasTag("building", values);
+        return p.hasTag(BUILDING, values);
     }
 
     @Override
     public void clear() {
         super.clear();
-        powerStations.clear();
         badConnections.clear();
-        missingTags.clear();
+        cellSegmentsWater.clear();
+        foundPowerLines.clear();
         missingNodes.clear();
-        wrongLineType.clear();
+        missingTags.clear();
+        powerStations.clear();
         refDiscontinuities.clear();
         segmentRefDiscontinuities.clear();
-        datasetWaterways.clear();
+        wrongLineType.clear();
     }
 }

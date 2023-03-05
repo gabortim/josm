@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
 import org.openstreetmap.josm.data.coor.ILatLon;
@@ -157,7 +158,7 @@ public final class Way extends OsmPrimitive implements IWay<Node> {
      */
     public List<Pair<Node, Node>> getNodePairs(boolean sort) {
         // For a way of size n, there are n - 1 pairs (a -> b, b -> c, c -> d, etc., 4 nodes -> 3 pairs)
-        List<Pair<Node, Node>> chunkSet = new ArrayList<>(this.getNodesCount() - 1);
+        List<Pair<Node, Node>> chunkSet = new ArrayList<>(Math.max(0, this.getNodesCount() - 1));
         if (isIncomplete()) return chunkSet;
         Node lastN = null;
         for (Node n : nodes) {
@@ -608,7 +609,23 @@ public final class Way extends OsmPrimitive implements IWay<Node> {
 
     @Override
     public boolean hasIncompleteNodes() {
-        return Arrays.stream(nodes).anyMatch(Node::isIncomplete);
+        /*
+         * Ideally, we would store this as a flag, but a node may become
+         * incomplete under some circumstances without being able to notify the
+         * way to recalculate the flag.
+         *
+         * When profiling #20716 on Mesa County, CO (overpass download), the
+         * Arrays.stream method was fairly expensive. When switching to the for
+         * loop, the CPU samples for hasIncompleteNodes went from ~150k samples
+         * to ~8.5k samples (94% improvement) and the memory allocations for
+         * hasIncompleteNodes went from ~15.6 GB to 0.
+         */
+        for (Node node : nodes) {
+            if (node.isIncomplete()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -651,19 +668,10 @@ public final class Way extends OsmPrimitive implements IWay<Node> {
      * Replies the segment lengths of the way as computed by {@link ILatLon#greatCircleDistance}.
      *
      * @return The segment lengths of a way in metres, following way direction
-     * @since xxx
+     * @since 18553
      */
     public double[] getSegmentLengths() {
-        List<Double> segmentLengths = new ArrayList<>();
-        Node lastN = null;
-        for (Node n:nodes) {
-            if (lastN != null && lastN.isLatLonKnown() && n.isLatLonKnown()) {
-                double distance = n.greatCircleDistance(lastN);
-                segmentLengths.add(distance);
-            }
-            lastN = n;
-        }
-        return segmentLengths.stream().mapToDouble(i -> i).toArray();
+        return this.segmentLengths().toArray();
     }
 
     /**
@@ -672,18 +680,24 @@ public final class Way extends OsmPrimitive implements IWay<Node> {
      * @since 8320
      */
     public double getLongestSegmentLength() {
-        double length = 0;
+        return this.segmentLengths().max().orElse(0);
+    }
+
+    /**
+     * Get the segment lengths as a stream
+     * @return The stream of segment lengths (ordered)
+     */
+    private DoubleStream segmentLengths() {
+        DoubleStream.Builder builder = DoubleStream.builder();
         Node lastN = null;
-        for (Node n:nodes) {
-            if (lastN != null && lastN.isLatLonKnown() && n.isLatLonKnown()) {
-                double l = n.greatCircleDistance(lastN);
-                if (l > length) {
-                    length = l;
-                }
+        for (Node n : nodes) {
+            if (lastN != null && n.isLatLonKnown() && lastN.isLatLonKnown()) {
+                double distance = n.greatCircleDistance(lastN);
+                builder.accept(distance);
             }
             lastN = n;
         }
-        return length;
+        return builder.build();
     }
 
     /**
