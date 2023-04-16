@@ -3,6 +3,7 @@ package org.openstreetmap.josm.gui.datatransfer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,7 +15,6 @@ import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openstreetmap.josm.gui.datatransfer.LayerTransferable.Data;
-import org.openstreetmap.josm.gui.layer.Layer;
 import org.openstreetmap.josm.gui.layer.LayerManagerTest;
 import org.openstreetmap.josm.gui.layer.LayerManagerTest.TestLayer;
 import org.openstreetmap.josm.gui.layer.MainLayerManager;
@@ -46,7 +46,7 @@ class LayerTransferableTest {
      */
     @Test
     void testLayerData() {
-        Data data = new Data(manager, Arrays.<Layer>asList(layer1, layer2));
+        Data data = new Data(manager, Arrays.asList(layer1, layer2));
 
         // need to be identity
         assertSame(manager, data.getManager());
@@ -60,7 +60,7 @@ class LayerTransferableTest {
      */
     @Test
     void testSupportedDataFlavor() {
-        LayerTransferable transferable = new LayerTransferable(manager, Arrays.<Layer>asList(layer1, layer2));
+        LayerTransferable transferable = new LayerTransferable(manager, Arrays.asList(layer1, layer2));
 
         assertFalse(transferable.isDataFlavorSupported(DataFlavor.imageFlavor));
         assertTrue(transferable.isDataFlavorSupported(LayerTransferable.LAYER_DATA));
@@ -76,11 +76,10 @@ class LayerTransferableTest {
      */
     @Test
     void testTransferData() throws Exception {
-        LayerTransferable transferable = new LayerTransferable(manager, Arrays.<Layer>asList(layer1, layer2));
+        LayerTransferable transferable = new LayerTransferable(manager, Arrays.asList(layer1, layer2));
 
         Object object = transferable.getTransferData(LayerTransferable.LAYER_DATA);
-        assertTrue(object instanceof Data);
-        Data data = (Data) object;
+        Data data = assertInstanceOf(Data.class, object);
         assertSame(manager, data.getManager());
         assertSame(layer1, data.getLayers().get(0));
         assertSame(layer2, data.getLayers().get(1));
@@ -91,7 +90,7 @@ class LayerTransferableTest {
      */
     @Test
     void testTransferDataUnsupported() {
-        LayerTransferable transferable = new LayerTransferable(manager, Arrays.<Layer>asList(layer1, layer2));
+        LayerTransferable transferable = new LayerTransferable(manager, Arrays.asList(layer1, layer2));
 
         assertThrows(UnsupportedFlavorException.class, () -> transferable.getTransferData(DataFlavor.imageFlavor));
     }
