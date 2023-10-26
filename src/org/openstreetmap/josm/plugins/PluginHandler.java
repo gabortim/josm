@@ -13,7 +13,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -33,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -77,6 +77,8 @@ import org.openstreetmap.josm.tools.GBC;
 import org.openstreetmap.josm.tools.I18n;
 import org.openstreetmap.josm.tools.ImageProvider;
 import org.openstreetmap.josm.tools.Logging;
+import org.openstreetmap.josm.tools.OpenBrowser;
+import org.openstreetmap.josm.tools.PlatformManager;
 import org.openstreetmap.josm.tools.ResourceProvider;
 import org.openstreetmap.josm.tools.SubclassFilteredCollection;
 import org.openstreetmap.josm.tools.Utils;
@@ -357,9 +359,21 @@ public final class PluginHandler {
     }
 
     /**
+     * Get a {@link ServiceLoader} for the specified service. This uses {@link #getJoinedPluginResourceCL()} as the
+     * class loader, so that we don't have to iterate through the {@link ClassLoader}s from {@link #getPluginClassLoaders()}.
+     * @param <S> The service type
+     * @param service The service class to look for
+     * @return The service loader
+     * @since 18833
+     */
+    public static <S> ServiceLoader<S> load(Class<S> service) {
+        return ServiceLoader.load(service, getJoinedPluginResourceCL());
+    }
+
+    /**
      * Removes deprecated plugins from a collection of plugins. Modifies the
      * collection <code>plugins</code>.
-     *
+     * <p>
      * Also notifies the user about removed deprecated plugins
      *
      * @param parent The parent Component used to display warning popup
@@ -410,7 +424,7 @@ public final class PluginHandler {
      * Removes unmaintained plugins from a collection of plugins. Modifies the
      * collection <code>plugins</code>. Also removes the plugin from the list
      * of plugins in the preferences, if necessary.
-     *
+     * <p>
      * Asks the user for every unmaintained plugin whether it should be removed.
      * @param parent The parent Component used to display warning popup
      *
@@ -465,7 +479,7 @@ public final class PluginHandler {
         } else {
             long tim = System.currentTimeMillis();
             long last = Config.getPref().getLong("pluginmanager.lastupdate", 0);
-            Integer maxTime = Config.getPref().getInt("pluginmanager.time-based-update.interval", DEFAULT_TIME_BASED_UPDATE_INTERVAL);
+            int maxTime = Config.getPref().getInt("pluginmanager.time-based-update.interval", DEFAULT_TIME_BASED_UPDATE_INTERVAL);
             long d = TimeUnit.MILLISECONDS.toDays(tim - last);
             if ((last <= 0) || (maxTime <= 0)) {
                 Config.getPref().put("pluginmanager.lastupdate", Long.toString(tim));
@@ -645,12 +659,32 @@ public final class PluginHandler {
                 ));
     }
 
-    private static void logJavaUpdateRequired(String plugin, int requiredVersion) {
-        Logging.warn(
-                tr("Plugin {0} requires Java version {1}. The current Java version is {2}. "
-                        +"You have to update Java in order to use this plugin.",
+    private static void alertJavaUpdateRequired(Component parent, String plugin, int requiredVersion) {
+        final ButtonSpec[] options = {
+                new ButtonSpec(tr("OK"), ImageProvider.get("ok"), tr("Click to close the dialog"), null),
+                new ButtonSpec(tr("Update Java"), ImageProvider.get("java"), tr("Update Java"), null)
+        };
+        final int selected = HelpAwareOptionPane.showOptionDialog(
+                parent,
+                "<html>" + tr("Plugin {0} requires Java version {1}. The current Java version is {2}.<br>"
+                                + "You have to update Java in order to use this plugin.",
                         plugin, Integer.toString(requiredVersion), Utils.getJavaVersion()
-                ));
+                ) + "</html>",
+                tr("Warning"),
+                JOptionPane.WARNING_MESSAGE,
+                null,
+                options,
+                options[0],
+                null
+        );
+        if (selected == 1) {
+            if (Utils.isRunningJavaWebStart()) {
+                OpenBrowser.displayUrl(Config.getPref().get("openwebstart.download.url", "https://openwebstart.com/download/"));
+            } else if (!Utils.isRunningWebStart()) {
+                final String javaUrl = PlatformManager.getPlatform().getJavaUrl();
+                OpenBrowser.displayUrl(javaUrl);
+            }
+        }
     }
 
     private static void alertJOSMUpdateRequired(Component parent, String plugin, int requiredVersion) {
@@ -662,7 +696,7 @@ public final class PluginHandler {
                 ),
                 tr("Warning"),
                 JOptionPane.WARNING_MESSAGE,
-                ht("/Plugin/Loading#JOSMUpdateRequired")
+                null
         );
     }
 
@@ -687,8 +721,7 @@ public final class PluginHandler {
 
         // make sure the plugin is compatible with the current Java version
         if (plugin.localminjavaversion > Utils.getJavaVersion()) {
-            // Just log a warning until we switch to Java 11 so that javafx plugin does not trigger a popup
-            logJavaUpdateRequired(plugin.name, plugin.localminjavaversion);
+            alertJavaUpdateRequired(parent, plugin.name, plugin.localminjavaversion);
             return false;
         }
 
@@ -757,7 +790,7 @@ public final class PluginHandler {
 
     /**
      * Get class loader to locate resources from plugins.
-     *
+     * <p>
      * It joins URLs of all plugins, to find images, etc.
      * (Not for loading Java classes - each plugin has a separate {@link PluginClassLoader}
      * for that purpose.)
@@ -910,7 +943,7 @@ public final class PluginHandler {
     /**
      * Loads plugins from <code>plugins</code> which have the flag {@link PluginInformation#early} set to true
      * <i>and</i> a negative {@link PluginInformation#stage} value.
-     *
+     * <p>
      * This is meant for plugins that provide additional {@link javax.swing.LookAndFeel}.
      */
     public static void loadVeryEarlyPlugins() {
@@ -955,7 +988,7 @@ public final class PluginHandler {
      * plugin lists.
      *
      * @param monitor the progress monitor. Defaults to {@link NullProgressMonitor#INSTANCE} if null.
-     * @return the list of locally available plugin information, null in case of errors
+     * @return the map of locally available plugin information, null in case of errors
      *
      */
     private static Map<String, PluginInformation> loadLocallyAvailablePluginInformation(ProgressMonitor monitor) {
@@ -1006,13 +1039,13 @@ public final class PluginHandler {
     }
 
     /**
-     * Builds the set of plugins to load. Deprecated and unmaintained plugins are filtered
+     * Builds the list of plugins to load. Deprecated and unmaintained plugins are filtered
      * out. This involves user interaction. This method displays alert and confirmation
      * messages.
      *
      * @param parent The parent component to be used for the displayed dialog
      * @param monitor the progress monitor. Defaults to {@link NullProgressMonitor#INSTANCE} if null.
-     * @return the set of plugins to load (as set of plugin names)
+     * @return the list of plugins to load (as set of plugin names)
      */
     public static List<PluginInformation> buildListOfPluginsToLoad(Component parent, ProgressMonitor monitor) {
         if (monitor == null) {
@@ -1020,7 +1053,7 @@ public final class PluginHandler {
         }
         try {
             monitor.beginTask(tr("Determining plugins to load..."));
-            Set<String> plugins = new HashSet<>(Config.getPref().getList("plugins", new LinkedList<String>()));
+            Set<String> plugins = new HashSet<>(Config.getPref().getList("plugins", new LinkedList<>()));
             Logging.debug("Plugins list initialized to {0}", plugins);
             String systemProp = Utils.getSystemProperty("josm.plugins");
             if (systemProp != null) {
@@ -1313,7 +1346,7 @@ public final class PluginHandler {
 
     /**
      * Installs downloaded plugins. Moves files with the suffix ".jar.new" to the corresponding ".jar" files.
-     *
+     * <p>
      * If {@code dowarn} is true, this methods emits warning messages on the console if a downloaded
      * but not yet installed plugin .jar can't be be installed. If {@code dowarn} is false, the
      * installation of the respective plugin is silently skipped.
@@ -1327,7 +1360,7 @@ public final class PluginHandler {
         if (!pluginDir.exists() || !pluginDir.isDirectory() || !pluginDir.canWrite())
             return;
 
-        final File[] files = pluginDir.listFiles((FilenameFilter) (dir, name) -> name.endsWith(".jar.new"));
+        final File[] files = pluginDir.listFiles((dir, name) -> name.endsWith(".jar.new"));
         if (files == null)
             return;
 

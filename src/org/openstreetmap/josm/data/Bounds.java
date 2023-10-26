@@ -501,7 +501,7 @@ public class Bounds implements IBounds {
 
     /**
      * Determines if this Bounds object crosses the 180th Meridian.
-     * See http://wiki.openstreetmap.org/wiki/180th_meridian
+     * See <a href="http://wiki.openstreetmap.org/wiki/180th_meridian">180th Meridian</a>.
      * @return true if this Bounds object crosses the 180th Meridian.
      */
     @Override
@@ -552,9 +552,8 @@ public class Bounds implements IBounds {
      * @return The string encoded bounds
      */
     public String encodeAsString(String separator) {
-        return new StringBuilder()
-          .append(minLat).append(separator).append(minLon).append(separator)
-          .append(maxLat).append(separator).append(maxLon).toString();
+        return minLat + separator + minLon + separator +
+                maxLat + separator + maxLon;
     }
 
     /**

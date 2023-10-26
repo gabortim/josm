@@ -75,12 +75,11 @@ public class UploadDialogModel extends TagEditorModel {
      * @return the hashtags separated by ";" or null
      */
     String findHashTags(String comment) {
-        String hashtags = String.join(";",
-            Arrays.stream(comment.split("\\s", -1))
-                .map(s -> Utils.strip(s, ",;"))
-                .filter(s -> s.matches("#[a-zA-Z0-9][-_a-zA-Z0-9]+"))
-                .collect(Collectors.toList()));
-        return hashtags.isEmpty() ? null : hashtags;
+        String foundHashtags = Arrays.stream(comment.split("\\s", -1))
+            .map(s -> Utils.strip(s, ",;"))
+            .filter(s -> s.matches("#[a-zA-Z0-9][-_a-zA-Z0-9]+"))
+            .distinct().collect(Collectors.joining(";"));
+        return foundHashtags.isEmpty() ? null : foundHashtags;
     }
 
     /**
@@ -96,7 +95,9 @@ public class UploadDialogModel extends TagEditorModel {
             if (hashtags != null) {
                 Set<String> sanitizedHashtags = new LinkedHashSet<>();
                 for (String hashtag : hashtags.split(";", -1)) {
-                    sanitizedHashtags.add(hashtag.startsWith("#") ? hashtag : "#" + hashtag);
+                    if (comment == null || !comment.contains(hashtag)) {
+                        sanitizedHashtags.add(hashtag.startsWith("#") ? hashtag : "#" + hashtag);
+                    }
                 }
                 if (!sanitizedHashtags.isEmpty()) {
                     result.append(' ').append(String.join(" ", sanitizedHashtags));
@@ -108,7 +109,7 @@ public class UploadDialogModel extends TagEditorModel {
 
     /**
      * Inserts/updates/deletes a tag.
-     *
+     * <p>
      * Existing keys are updated. Others are added. A value of {@code null}
      * deletes the key.
      *
@@ -131,7 +132,7 @@ public class UploadDialogModel extends TagEditorModel {
 
     /**
      * Inserts/updates/deletes a tag.
-     *
+     * <p>
      * Existing keys are updated. Others are added. A value of {@code null}
      * deletes the key.
      *
@@ -147,7 +148,7 @@ public class UploadDialogModel extends TagEditorModel {
 
     /**
      * Inserts/updates/deletes all tags from {@code map}.
-     *
+     * <p>
      * Existing keys are updated. Others are added. A value of {@code null}
      * deletes the key.
      *
@@ -155,7 +156,7 @@ public class UploadDialogModel extends TagEditorModel {
      */
     public void putAll(Map<String, String> map) {
         commitPendingEdit();
-        map.forEach((key, value) -> doPut(key, value));
+        map.forEach(this::doPut);
         setDirty(true);
         fireTableDataChanged();
     }

@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.TimeZone;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.gpx.GpxConstants;
@@ -26,23 +25,13 @@ import org.openstreetmap.josm.data.gpx.IGpxTrack;
 import org.openstreetmap.josm.data.gpx.IGpxTrackSegment;
 import org.openstreetmap.josm.data.gpx.WayPoint;
 import org.openstreetmap.josm.io.GpxReaderTest;
-import org.openstreetmap.josm.testutils.JOSMTestRules;
 import org.openstreetmap.josm.tools.date.DateUtils;
 import org.xml.sax.SAXException;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Unit tests of {@link NmeaReader} class.
  */
 class NmeaReaderTest {
-    /**
-     * Set the timezone and timeout.
-     */
-    @RegisterExtension
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD")
-    public JOSMTestRules test = new JOSMTestRules();
-
     /**
      * Tests reading a nmea file.
      * @throws Exception if any error occurs
@@ -105,12 +94,12 @@ class NmeaReaderTest {
      */
     @Test
     void testIsSentence() {
-        assertTrue(NmeaReader.isSentence("$GPVTG", Sentence.VTG));
-        assertTrue(NmeaReader.isSentence("$GAVTG", Sentence.VTG));
-        assertTrue(NmeaReader.isSentence("$GNVTG", Sentence.VTG));
-        assertFalse(NmeaReader.isSentence("XGAVTG", Sentence.VTG));
-        assertFalse(NmeaReader.isSentence("$GPXXX", Sentence.VTG));
-        assertFalse(NmeaReader.isSentence("$XXVTG", Sentence.VTG));
+        assertTrue(NmeaParser.isSentence("$GPVTG", Sentence.VTG));
+        assertTrue(NmeaParser.isSentence("$GAVTG", Sentence.VTG));
+        assertTrue(NmeaParser.isSentence("$GNVTG", Sentence.VTG));
+        assertFalse(NmeaParser.isSentence("XGAVTG", Sentence.VTG));
+        assertFalse(NmeaParser.isSentence("$GPXXX", Sentence.VTG));
+        assertFalse(NmeaParser.isSentence("$XXVTG", Sentence.VTG));
     }
 
     /**

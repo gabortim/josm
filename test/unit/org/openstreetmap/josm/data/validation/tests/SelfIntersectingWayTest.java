@@ -10,30 +10,19 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openstreetmap.josm.JOSMFixture;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmUtils;
 import org.openstreetmap.josm.data.osm.Way;
 
 /**
- * JUnit Test of Multipolygon validation test.
+ * JUnit Test of {@link SelfIntersectingWay} validation test.
  */
 class SelfIntersectingWayTest {
-
-    /**
-     * Setup test.
-     * @throws Exception if test cannot be initialized
-     */
-    @BeforeAll
-    public static void setUp() throws Exception {
-        JOSMFixture.createUnitTestFixture().init();
-    }
 
     private static List<Node> createNodes() {
         List<Node> nodes = IntStream.range(0, 6).mapToObj(i -> new Node(i + 1)).collect(Collectors.toList());

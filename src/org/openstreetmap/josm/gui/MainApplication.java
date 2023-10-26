@@ -841,8 +841,6 @@ public class MainApplication {
 
         PlatformManager.getPlatform().afterPrefStartupHook();
 
-        applyWorkarounds();
-
         FontsManager.initialize();
 
         GuiHelper.setupLanguageFonts();
@@ -913,6 +911,8 @@ public class MainApplication {
         }
         // Configure Look and feel before showing SplashScreen (#19290)
         setupUIManager();
+        // Then apply LaF workarounds
+        applyLaFWorkarounds();
         // MainFrame created before setting look and feel and not updated (#20771)
         SwingUtilities.updateComponentTreeUI(mainFrame);
 
@@ -992,7 +992,7 @@ public class MainApplication {
         ChangesetUpdater.start();
 
         if (Config.getPref().getBoolean("debug.edt-checker.enable", Version.getInstance().isLocalBuild())) {
-            // Repaint manager is registered so late for a reason - there is lots of violation during startup process
+            // Repaint manager is registered so late for a reason - there are lots of violations during startup process
             // but they don't seem to break anything and are difficult to fix
             Logging.info("Enabled EDT checker, wrongful access to gui from non EDT thread will be printed to console");
             RepaintManager.setCurrentManager(new CheckThreadViolationRepaintManager());
@@ -1062,7 +1062,11 @@ public class MainApplication {
                 JOSM_WEBSITE_NTV2_SOURCE);
     }
 
-    static void applyWorkarounds() {
+    /**
+     * Apply workarounds for LaF and platform specific issues. This must be called <i>after</i> the
+     * LaF is set.
+     */
+    static void applyLaFWorkarounds() {
         final String laf = UIManager.getLookAndFeel().getID();
         final int javaVersion = Utils.getJavaVersion();
         // Workaround for JDK-8180379: crash on Windows 10 1703 with Windows L&F and java < 8u141 / 9+172
@@ -1100,6 +1104,12 @@ public class MainApplication {
         // Workaround for JDK-8262085
         if ("Metal".equals(laf) && javaVersion >= 11 && javaVersion < 17) {
             UIManager.put("ToolTipUI", JosmMetalToolTipUI.class.getCanonicalName());
+        }
+
+        // See #20850. The upstream bug (JDK-6396936) is unlikely to ever be fixed due to potential compatibility
+        // issues. This affects Windows LaF only (includes Windows Classic, a sub-LaF of Windows LaF).
+        if ("Windows".equals(laf) && "Monospaced".equals(UIManager.getFont("TextArea.font").getFamily())) {
+            UIManager.put("TextArea.font", UIManager.getFont("TextField.font"));
         }
     }
 
@@ -1180,7 +1190,7 @@ public class MainApplication {
         UIManager.put("OptionPane.yesIcon", UIManager.get("OptionPane.okIcon"));
         UIManager.put("OptionPane.cancelIcon", ImageProvider.getIfAvailable("cancel"));
         UIManager.put("OptionPane.noIcon", UIManager.get("OptionPane.cancelIcon"));
-        // Ensures caret color is the same than text foreground color, see #12257
+        // Ensures caret color is the same as text foreground color, see #12257
         // See https://docs.oracle.com/javase/8/docs/api/javax/swing/plaf/synth/doc-files/componentProperties.html
         for (String p : Arrays.asList(
                 "EditorPane", "FormattedTextField", "PasswordField", "TextArea", "TextField", "TextPane")) {

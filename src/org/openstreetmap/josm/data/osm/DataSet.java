@@ -5,6 +5,7 @@ import static org.openstreetmap.josm.tools.I18n.tr;
 
 import java.awt.geom.Area;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -314,6 +315,8 @@ public final class DataSet implements OsmData<OsmPrimitive, Node, Way, Relation>
      *
      * @return list of history entries
      */
+    // This needs to return something like a Sequenced Collection (Java 21)
+    @SuppressWarnings({"NonApiType", "squid:S1319"})
     public LinkedList<Collection<? extends OsmPrimitive>> getSelectionHistory() {
         return selectionHistory;
     }
@@ -372,8 +375,8 @@ public final class DataSet implements OsmData<OsmPrimitive, Node, Way, Relation>
     private final Map<String, String> changeSetTags = new HashMap<>();
 
     /**
-     * Replies the set of changeset tags to be applied when or if this is ever uploaded.
-     * @return the set of changeset tags
+     * Replies the map of changeset tags to be applied when or if this is ever uploaded.
+     * @return the map of changeset tags
      * @see #addChangeSetTag
      */
     public Map<String, String> getChangeSetTags() {
@@ -545,7 +548,7 @@ public final class DataSet implements OsmData<OsmPrimitive, Node, Way, Relation>
 
     /**
      * Removes a primitive from the dataset. This method only removes the
-     * primitive form the respective collection of primitives managed
+     * primitive from the respective collection of primitives managed
      * by this dataset, i.e. from {@code store.nodes}, {@code store.ways}, or
      * {@code store.relations}. References from other primitives to this
      * primitive are left unchanged.
@@ -564,11 +567,65 @@ public final class DataSet implements OsmData<OsmPrimitive, Node, Way, Relation>
         });
     }
 
+    /**
+     * Removes primitives from the dataset. This method only removes the
+     * primitives from the respective collection of primitives managed
+     * by this dataset, i.e. from {@code store.nodes}, {@code store.ways}, or
+     * {@code store.relations}. References from other primitives to this
+     * primitive are left unchanged.
+     *
+     * @param primitiveIds the ids of the primitive
+     * @throws IllegalStateException if the dataset is read-only
+     * @since 18724
+     */
+    public void removePrimitives(PrimitiveId... primitiveIds) {
+        this.removePrimitives(Arrays.asList(primitiveIds));
+    }
+
+    /**
+     * Removes primitives from the dataset. This method only removes the
+     * primitives from the respective collection of primitives managed
+     * by this dataset, i.e. from {@code store.nodes}, {@code store.ways}, or
+     * {@code store.relations}. References from other primitives to this
+     * primitive are left unchanged.
+     *
+     * @param primitiveIds the ids of the primitive
+     * @throws IllegalStateException if the dataset is read-only
+     * @since 18724
+     */
+    public void removePrimitives(Collection<PrimitiveId> primitiveIds) {
+        checkModifiable();
+        final List<PrimitiveId> selected = new ArrayList<>();
+        update(() -> {
+            clearSelection(primitiveIds);
+            final List<OsmPrimitive> removed = new ArrayList<>(primitiveIds.size());
+            for (PrimitiveId primitiveId : primitiveIds) {
+                OsmPrimitive primitive = this.getPrimitiveByIdChecked(primitiveId);
+                if (primitive == null) {
+                    continue;
+                } else if (primitive.isSelected()) {
+                    selected.add(primitive);
+                }
+                this.removePrimitiveFromStorage(primitive);
+                removed.add(primitive);
+            }
+            firePrimitivesRemoved(removed, false);
+        });
+        if (!selected.isEmpty()) {
+            throw new DataIntegrityProblemException("Primitives were re-selected by a selection listener: "
+            + selected.stream().map(PrimitiveId::toString).collect(Collectors.joining(", ")));
+        }
+    }
+
     private void removePrimitiveImpl(OsmPrimitive primitive) {
         clearSelection(primitive.getPrimitiveId());
         if (primitive.isSelected()) {
             throw new DataIntegrityProblemException("Primitive was re-selected by a selection listener: " + primitive);
         }
+        this.removePrimitiveFromStorage(primitive);
+    }
+
+    private void removePrimitiveFromStorage(OsmPrimitive primitive) {
         store.removePrimitive(primitive);
         allPrimitives.remove(primitive);
         primitive.setDataset(null);

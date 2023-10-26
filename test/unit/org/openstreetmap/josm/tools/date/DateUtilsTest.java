@@ -18,27 +18,20 @@ import java.util.concurrent.ForkJoinPool;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.openstreetmap.josm.testutils.JOSMTestRules;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openstreetmap.josm.testutils.annotations.BasicPreferences;
+import org.openstreetmap.josm.testutils.annotations.I18n;
 import org.openstreetmap.josm.tools.UncheckedParseException;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import net.trajano.commons.testing.UtilityClassTestUtil;
 
 /**
  * Unit tests of {@link DateUtils} class.
  */
+@BasicPreferences
+@I18n
 public class DateUtilsTest {
-
-    /**
-     * Set the timezone and timeout.
-     * <p>
-     * Timeouts need to be disabled because we change the time zone.
-     */
-    @RegisterExtension
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD")
-    public JOSMTestRules test = new JOSMTestRules().i18n().preferences();
-
     /**
      * Tests that {@code DateUtils} satisfies utility class criteria.
      * @throws ReflectiveOperationException if an error occurs
@@ -115,9 +108,10 @@ public class DateUtilsTest {
     /**
      * Verifies that parsing an illegal date throws a {@link UncheckedParseException}
      */
-    @Test
-    void testIllegalDate() {
-        assertThrows(UncheckedParseException.class, () -> DateUtils.fromString("2014-"));
+    @ParameterizedTest
+    @ValueSource(strings = {"2014-", "2014-01-", "2014-01-01T", "2014-00-01", "2014-01-00"})
+    void testIllegalDate(String date) {
+        assertThrows(UncheckedParseException.class, () -> DateUtils.fromString(date));
     }
 
     /**

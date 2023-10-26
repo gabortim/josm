@@ -3,21 +3,21 @@ package org.openstreetmap.josm.io;
 
 import static org.openstreetmap.josm.tools.I18n.tr;
 
+import java.io.IOException;
 import java.io.InputStream;
-import java.net.SocketException;
 import java.util.Collection;
 import java.util.Map.Entry;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonException;
-import javax.json.JsonNumber;
-import javax.json.JsonObject;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-import javax.json.stream.JsonParser;
-import javax.json.stream.JsonParser.Event;
-import javax.json.stream.JsonParsingException;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonException;
+import jakarta.json.JsonNumber;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonString;
+import jakarta.json.JsonValue;
+import jakarta.json.stream.JsonParser;
+import jakarta.json.stream.JsonParser.Event;
+import jakarta.json.stream.JsonParsingException;
 
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.PrimitiveData;
@@ -32,7 +32,7 @@ import org.openstreetmap.josm.tools.UncheckedParseException;
 
 /**
  * Parser for the Osm API (JSON output). Read from an input stream and construct a dataset out of it.
- *
+ * <p>
  * For each json element, there is a dedicated method.
  * @since 14086
  */
@@ -189,8 +189,8 @@ public class OsmJsonReader extends AbstractReader {
         } catch (JsonParsingException exception) {
             throw new IllegalDataException(exception);
         } catch (JsonException exception) {
-            if (exception.getCause() instanceof SocketException) {
-                SocketException soe = (SocketException) exception.getCause();
+            if (exception.getCause() instanceof IOException) {
+                IOException soe = (IOException) exception.getCause();
                 soe.addSuppressed(exception); // Add the caught exception as a suppressed exception
                 throw new IllegalDataException(soe); // NOPMD -- PreserveStackTrace should be fixed with PMD 7
             }

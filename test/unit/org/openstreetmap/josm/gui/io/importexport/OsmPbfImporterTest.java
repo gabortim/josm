@@ -4,6 +4,7 @@ package org.openstreetmap.josm.gui.io.importexport;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,7 @@ import org.openstreetmap.josm.data.coor.ILatLon;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.data.osm.AbstractPrimitive;
 import org.openstreetmap.josm.data.osm.DataSet;
+import org.openstreetmap.josm.data.osm.OsmPrimitiveType;
 import org.openstreetmap.josm.data.osm.Relation;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.protobuf.ProtobufTest;
@@ -128,5 +130,16 @@ class OsmPbfImporterTest {
                     () -> assertSame(way, rel.getMember(0).getMember())
             );
         }
+    }
+
+    @Test
+    void testIdParsing() throws IOException, IllegalDataException {
+        final DataSet dataSet;
+        try (InputStream inputStream = TestUtils.getRegressionDataStream(23165, "largeIds.osm.pbf")) {
+            dataSet = importer.parseDataSet(inputStream, NullProgressMonitor.INSTANCE);
+        }
+        assertNotNull(dataSet.getPrimitiveById(9223372036854775806L, OsmPrimitiveType.NODE));
+        assertNotNull(dataSet.getPrimitiveById(9223372036854775806L, OsmPrimitiveType.WAY));
+        assertNotNull(dataSet.getPrimitiveById(9223372036854775806L, OsmPrimitiveType.RELATION));
     }
 }

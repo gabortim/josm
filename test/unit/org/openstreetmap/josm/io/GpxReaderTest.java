@@ -4,9 +4,9 @@ package org.openstreetmap.josm.io;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.data.Bounds;
 import org.openstreetmap.josm.data.coor.LatLon;
@@ -38,7 +40,7 @@ public class GpxReaderTest {
      */
     public static GpxData parseGpxData(String filename) throws IOException, SAXException {
         final GpxData result;
-        try (FileInputStream in = new FileInputStream(new File(filename))) {
+        try (FileInputStream in = new FileInputStream(filename)) {
             GpxReader reader = new GpxReader(in);
             assertTrue(reader.parse(false));
             result = reader.getGpxData();
@@ -82,10 +84,9 @@ public class GpxReaderTest {
 
     /**
      * Tests invalid data.
-     * @throws Exception always SAXException
      */
     @Test
-    void testException() throws Exception {
+    void testException() {
         assertThrows(SAXException.class,
                 () -> new GpxReader(new ByteArrayInputStream("--foo--bar--".getBytes(StandardCharsets.UTF_8))).parse(true));
     }
@@ -99,5 +100,28 @@ public class GpxReaderTest {
     void testTicket15634() throws IOException, SAXException {
         assertEquals(new Bounds(53.7229357, -7.9135019, 53.9301103, -7.59656),
                 GpxReaderTest.parseGpxData(TestUtils.getRegressionDataFile(15634, "drumlish.gpx")).getMetaBounds());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "<gpx><wpt></wpt></gpx>",
+            "<gpx><trk><trkseg><trkpt></trkpt></trkseg></trk></gpx>",
+            "<gpx><rte><rtept></rtept></rte></gpx>"
+    })
+    void testIncompleteLocations(String gpx) {
+        SAXException saxException = assertThrows(SAXException.class,
+                () -> new GpxReader(new ByteArrayInputStream(gpx.getBytes(StandardCharsets.UTF_8))).parse(true));
+        final String type;
+        if ("<wpt>".regionMatches(0, gpx, 5, 4)) {
+            type = "wpt";
+        } else if ("<trkpt>".regionMatches(0, gpx, 18, 7)) {
+            type = "trkpt";
+        } else if ("<rtept>".regionMatches(0, gpx, 10, 7)) {
+            type = "rtept";
+        } else {
+            fail("You need to add code to tell us what the exception for \"" + gpx + "\" should be");
+            type = null;
+        }
+        assertEquals(type + " element does not have valid latitude and/or longitude.", saxException.getMessage());
     }
 }

@@ -231,9 +231,10 @@ public class MapCSSTagChecker extends Test.TagTest {
                 }
                 final Selector selector = check.whichSelectorMatchesEnvironment(env);
                 if (selector != null) {
-                    check.rule.declaration.execute(env);
+                    final Environment envWithSelector = env.withSelector(selector);
+                    check.rule.declaration.execute(envWithSelector);
                     if (!ignoreError && !check.errors.isEmpty()) {
-                        r.addAll(check.getErrorsForPrimitive(p, selector, env, new MapCSSTagCheckerAndRule(check.rule)));
+                        r.addAll(check.getErrorsForPrimitive(p, selector, envWithSelector, new MapCSSTagCheckerAndRule(check.rule)));
                     }
                 }
             }
@@ -444,7 +445,7 @@ public class MapCSSTagChecker extends Test.TagTest {
                 cnt++;
                 // add frequently changing info to progress monitor so that it
                 // doesn't seem to hang when test takes longer than 0.5 seconds
-                if (cnt % 10000 == 0 && stopwatch.elapsed() >= 500) {
+                if (cnt % 10_000 == 0 && stopwatch.elapsed() >= 500) {
                     progressMonitor.setExtraText(tr(" {0}: {1} of {2} elements done", title, cnt, selection.size()));
                 }
             }

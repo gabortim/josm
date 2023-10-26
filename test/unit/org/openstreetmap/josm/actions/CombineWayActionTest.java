@@ -14,7 +14,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.Test;
 import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.data.osm.DataSet;
@@ -23,23 +22,14 @@ import org.openstreetmap.josm.data.osm.NodePair;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.io.IllegalDataException;
 import org.openstreetmap.josm.io.OsmReader;
-import org.openstreetmap.josm.testutils.JOSMTestRules;
+import org.openstreetmap.josm.testutils.annotations.ResetUniquePrimitiveIdCounters;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import nl.jqno.equalsverifier.EqualsVerifier;
 
 /**
  * Unit tests for class {@link CombineWayAction}.
  */
 class CombineWayActionTest {
-
-    /**
-     * Setup test.
-     */
-    @RegisterExtension
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD")
-    public JOSMTestRules test = new JOSMTestRules();
-
     /**
      * Non-regression test for bug #11957.
      * @throws IOException if any I/O error occurs
@@ -124,6 +114,7 @@ class CombineWayActionTest {
      * @throws IllegalDataException if OSM parsing fails
      */
     @Test
+    @ResetUniquePrimitiveIdCounters
     void testTicket18367NeedsSplit() throws IOException, IllegalDataException {
         try (InputStream is = TestUtils.getRegressionDataStream(18367, "split-and-reverse.osm")) {
             DataSet ds = OsmReader.parseDataSet(is, null);

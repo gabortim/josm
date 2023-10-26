@@ -85,7 +85,7 @@ public abstract class JCSCachedTileLoaderJob<K, V extends CacheEntry> implements
 
     protected final long now; // when the job started
 
-    private final ICacheAccess<K, V> cache;
+    protected final ICacheAccess<K, V> cache;
     private ICacheElement<K, V> cacheElement;
     protected V cacheData;
     protected CacheEntryAttributes attributes;
@@ -292,9 +292,11 @@ public abstract class JCSCachedTileLoaderJob<K, V extends CacheEntry> implements
     }
 
     /**
-     * @return true if object was successfully downloaded, false, if there was a loading failure
+     * Load an cache object
+     * @return {@code true} if object was successfully downloaded, false, if there was a loading failure
+     * @since 18831
      */
-    private boolean loadObject() {
+    protected boolean loadObject() {
         if (attributes == null) {
             attributes = new CacheEntryAttributes();
         }
@@ -332,7 +334,8 @@ public abstract class JCSCachedTileLoaderJob<K, V extends CacheEntry> implements
     }
 
     /**
-     * @return true if object was successfully downloaded via http, false, if there was a loading failure
+     * Load an cache object via HTTP
+     * @return {@code true} if object was successfully downloaded via http, false, if there was a loading failure
      */
     private boolean loadObjectHttp() {
         try {

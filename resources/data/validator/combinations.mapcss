@@ -47,6 +47,8 @@ way[workrules                  ][!railway][route!=railway],
 way[length_unit                ][!waterway],
 way[canal                      ][!waterway],
 way[have_riverbank             ][!waterway],
+area[min_height                ][!height][/^(building|building:part)$/], /* #21286 */
+area[building:min_level        ][!building:levels][/^(building|building:part)$/], /* #21286 */
 *[border_type                  ][!boundary],
 *[piste:difficulty             ][!piste:type],
 *[place                        ][!name][place!=islet][place!=plot][noname!=yes],
@@ -117,8 +119,8 @@ way[cutline                    ][man_made!=cutline],
   group: tr("missing tag");
 }
 
-/* #20742 - No warning about barrier with inappropriate access tags on highway */
-way[highway=~/^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link)$/][!access][!vehicle] > node[barrier][barrier!~/entrance|border_control|height_restrictor|toll_booth/][!access][!motor_vehicle][!vehicle] {
+/* #20742 - No warning about barrier with inappropriate access tags on highway, #22739 */
+way[highway=~/^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link)$/][!access][!vehicle] > node[barrier][barrier!~/entrance|border_control|cattle_grid|height_restrictor|toll_booth/][!access][!motor_vehicle][!vehicle] {
   throwWarning: tr("{0} without access tags such as {1}, {2}, or {3}.", "{0.tag}", "{2.key}", "{3.key}", "{4.key}");
   group: tr("suspicious barrier");
 }
@@ -1076,3 +1078,11 @@ relation[piste:type=nordic][!piste:grooming]{
   throwWarning: tr("{0} is lower than {1} on {2}.", "{1.key}", "{0.key}", "{2.tag}");
   group: tr("suspicious tag combination");
 }
+
+/* #21286 */
+area[/^(building|building:part)$/][height =~ /^[0-9]+(\.[0-9]+)?( m)?$/][min_height =~ /^[0-9]+(\.[0-9]+)?( m)?$/][get(split(" ", tag(height)), 0) <= get(split(" ", tag(min_height)), 0)],
+area[/^(building|building:part)$/][building:levels][building:min_level][tag("building:levels") <= tag("building:min_level")] {
+  throwWarning: tr("{0} is lower or equal to {1} on {2}", "{1.key}", "{2.key}", "{0.key}");
+  group: tr("suspicious tag combination");
+}
+

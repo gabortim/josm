@@ -11,28 +11,22 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.layer.GpxLayer;
 import org.openstreetmap.josm.gui.layer.OsmDataLayer;
 import org.openstreetmap.josm.io.session.SessionWriterTest;
-import org.openstreetmap.josm.testutils.JOSMTestRules;
+import org.openstreetmap.josm.testutils.annotations.Main;
+import org.openstreetmap.josm.testutils.annotations.Projection;
 import org.openstreetmap.josm.testutils.mockers.JOptionPaneSimpleMocker;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.openstreetmap.josm.testutils.mockers.WindowMocker;
 
 /**
  * Unit tests for class {@link SessionSaveAsAction}.
  */
+@Main
+@Projection
 class SessionSaveActionTest {
-    /**
-     * Setup test.
-     */
-    @RegisterExtension
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD")
-    public JOSMTestRules test = new JOSMTestRules().main().projection();
-
     /**
      * Unit test of {@link SessionSaveAction}
      * @throws IOException Temp file could not be created
@@ -40,6 +34,7 @@ class SessionSaveActionTest {
     @Test
     void testSaveAction() throws IOException {
         TestUtils.assumeWorkingJMockit();
+        new WindowMocker();
 
         File jos = File.createTempFile("session", ".jos");
         File joz = new File(jos.getAbsolutePath().replaceFirst(".jos$", ".joz"));

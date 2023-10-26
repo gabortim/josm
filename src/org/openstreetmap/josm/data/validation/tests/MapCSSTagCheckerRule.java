@@ -17,8 +17,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.openstreetmap.josm.command.Command;
@@ -26,7 +24,6 @@ import org.openstreetmap.josm.command.DeleteCommand;
 import org.openstreetmap.josm.command.SequenceCommand;
 import org.openstreetmap.josm.data.osm.IPrimitive;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
-import org.openstreetmap.josm.data.osm.Tag;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.WaySegment;
 import org.openstreetmap.josm.data.validation.Severity;
@@ -34,12 +31,13 @@ import org.openstreetmap.josm.data.validation.Test;
 import org.openstreetmap.josm.data.validation.TestError;
 import org.openstreetmap.josm.gui.mappaint.Environment;
 import org.openstreetmap.josm.gui.mappaint.Keyword;
+import org.openstreetmap.josm.gui.mappaint.MultiCascade;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Condition;
-import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.TagCondition;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Expression;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Instruction;
 import org.openstreetmap.josm.gui.mappaint.mapcss.MapCSSRule;
 import org.openstreetmap.josm.gui.mappaint.mapcss.MapCSSStyleSource;
+import org.openstreetmap.josm.gui.mappaint.mapcss.PlaceholderExpression;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Selector;
 import org.openstreetmap.josm.gui.mappaint.mapcss.parsergen.MapCSSParser;
 import org.openstreetmap.josm.gui.mappaint.mapcss.parsergen.ParseException;
@@ -214,7 +212,7 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
     }
 
     Selector whichSelectorMatchesPrimitive(OsmPrimitive primitive) {
-        return whichSelectorMatchesEnvironment(new Environment(primitive));
+        return whichSelectorMatchesEnvironment(new Environment(primitive, new MultiCascade(), Environment.DEFAULT_LAYER, null));
     }
 
     Selector whichSelectorMatchesEnvironment(Environment env) {
@@ -222,37 +220,6 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
                 .filter(i -> i.matches(env.clearSelectorMatchingInformation()))
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * Determines the {@code index}-th key/value/tag (depending on {@code type}) of the
-     * {@link org.openstreetmap.josm.gui.mappaint.mapcss.Selector.GeneralSelector}.
-     *
-     * @param matchingSelector matching selector
-     * @param index            index
-     * @param type             selector type ("key", "value" or "tag")
-     * @param p                OSM primitive
-     * @return argument value, can be {@code null}
-     */
-    static String determineArgument(Selector.GeneralSelector matchingSelector, int index, String type, OsmPrimitive p) {
-        try {
-            final Condition c = matchingSelector.getConditions().get(index);
-            final Tag tag = c instanceof TagCondition
-                    ? ((TagCondition) c).asTag(p)
-                    : null;
-            if (tag == null) {
-                return null;
-            } else if ("key".equals(type)) {
-                return tag.getKey();
-            } else if ("value".equals(type)) {
-                return tag.getValue();
-            } else if ("tag".equals(type)) {
-                return tag.toString();
-            }
-        } catch (IndexOutOfBoundsException ignore) {
-            Logging.debug(ignore);
-        }
-        return null;
     }
 
     /**
@@ -265,25 +232,7 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
      * @return string with arguments inserted
      */
     static String insertArguments(Selector matchingSelector, String s, OsmPrimitive p) {
-        if (s != null && matchingSelector instanceof Selector.ChildOrParentSelector) {
-            return insertArguments(((Selector.ChildOrParentSelector) matchingSelector).right, s, p);
-        } else if (s == null || !(matchingSelector instanceof Selector.GeneralSelector)) {
-            return s;
-        }
-        final Matcher m = Pattern.compile("\\{(\\d+)\\.(key|value|tag)\\}").matcher(s);
-        final StringBuffer sb = new StringBuffer();
-        while (m.find()) {
-            final String argument = determineArgument((Selector.GeneralSelector) matchingSelector,
-                    Integer.parseInt(m.group(1)), m.group(2), p);
-            try {
-                // Perform replacement with null-safe + regex-safe handling
-                m.appendReplacement(sb, String.valueOf(argument).replace("^(", "").replace(")$", ""));
-            } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
-                Logging.log(Logging.LEVEL_ERROR, tr("Unable to replace argument {0} in {1}: {2}", argument, sb, e.getMessage()), e);
-            }
-        }
-        m.appendTail(sb);
-        return sb.toString();
+        return PlaceholderExpression.insertArguments(matchingSelector, s, p);
     }
 
     /**
@@ -317,18 +266,20 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
     /**
      * Constructs a (localized) message for this deprecation check.
      *
+     * @param selector The selector to use
      * @param p OSM primitive
      * @return a message
      */
-    String getMessage(OsmPrimitive p) {
+    String getMessage(Selector selector, OsmPrimitive p) {
         if (errors.isEmpty()) {
             // Return something to avoid NPEs
             return rule.declaration.toString();
         } else {
             final Object val = errors.keySet().iterator().next().val;
+            selector = selector == null && p != null ? whichSelectorMatchesPrimitive(p) : selector;
             return String.valueOf(
                     val instanceof Expression
-                            ? ((Expression) val).evaluate(new Environment(p))
+                            ? ((Expression) val).evaluate(new Environment(p).withSelector(selector))
                             : val
             );
         }
@@ -337,16 +288,17 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
     /**
      * Constructs a (localized) description for this deprecation check.
      *
+     * @param selector The selector to use
      * @param p OSM primitive
      * @return a description (possibly with alternative suggestions)
      * @see #getDescriptionForMatchingSelector
      */
-    String getDescription(OsmPrimitive p) {
+    String getDescription(Selector selector, OsmPrimitive p) {
         if (alternatives.isEmpty()) {
-            return getMessage(p);
+            return getMessage(selector, p);
         } else {
             /* I18N: {0} is the test error message and {1} is an alternative */
-            return tr("{0}, use {1} instead", getMessage(p), String.join(tr(" or "), alternatives));
+            return tr("{0}, use {1} instead", getMessage(selector, p), String.join(tr(" or "), alternatives));
         }
     }
 
@@ -359,7 +311,7 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
      * @return a description (possibly with alternative suggestions)
      */
     String getDescriptionForMatchingSelector(OsmPrimitive p, Selector matchingSelector) {
-        return insertArguments(matchingSelector, getDescription(p), p);
+        return insertArguments(matchingSelector, getDescription(matchingSelector, p), p);
     }
 
     Severity getSeverity() {
@@ -368,7 +320,7 @@ final class MapCSSTagCheckerRule implements Predicate<OsmPrimitive> {
 
     @Override
     public String toString() {
-        return getDescription(null);
+        return getDescription(null, null);
     }
 
     /**

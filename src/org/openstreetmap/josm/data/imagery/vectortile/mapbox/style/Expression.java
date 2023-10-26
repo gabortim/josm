@@ -5,10 +5,10 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonString;
-import javax.json.JsonValue;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonString;
+import jakarta.json.JsonValue;
 
 /**
  * A Mapbox vector style expression (immutable)
@@ -19,7 +19,6 @@ import javax.json.JsonValue;
 public final class Expression {
     /** An empty expression to use */
     public static final Expression EMPTY_EXPRESSION = new Expression(JsonValue.NULL);
-    private static final String EMPTY_STRING = "";
 
     private final String mapcssFilterExpression;
 
@@ -37,13 +36,13 @@ public final class Expression {
                 } else if (Arrays.asList("<=", ">=", ">", "<", "!=").contains(array.getString(0))) {
                     this.mapcssFilterExpression = convertToString(array.get(1)) + array.getString(0) + convertToString(array.get(2));
                 } else {
-                    this.mapcssFilterExpression = EMPTY_STRING;
+                    this.mapcssFilterExpression = "";
                 }
             } else {
-                this.mapcssFilterExpression = EMPTY_STRING;
+                this.mapcssFilterExpression = "";
             }
         } else {
-            this.mapcssFilterExpression = EMPTY_STRING;
+            this.mapcssFilterExpression = "";
         }
     }
 
@@ -74,13 +73,13 @@ public final class Expression {
               + '}';
         case NULL:
         default:
-            return EMPTY_STRING;
+            return "";
         }
     }
 
     @Override
     public String toString() {
-        return !EMPTY_STRING.equals(this.mapcssFilterExpression) ? '[' + this.mapcssFilterExpression + ']' : EMPTY_STRING;
+        return !"".equals(this.mapcssFilterExpression) ? '[' + this.mapcssFilterExpression + ']' : "";
     }
 
     @Override

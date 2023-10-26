@@ -15,7 +15,6 @@ import java.util.Iterator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.openstreetmap.josm.TestUtils;
 import org.openstreetmap.josm.actions.ExpertToggleAction;
 import org.openstreetmap.josm.data.Bounds;
@@ -34,24 +33,17 @@ import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.gui.datatransfer.ClipboardUtils;
 import org.openstreetmap.josm.io.IllegalDataException;
 import org.openstreetmap.josm.io.OsmReader;
-import org.openstreetmap.josm.testutils.JOSMTestRules;
+import org.openstreetmap.josm.testutils.annotations.Main;
+import org.openstreetmap.josm.testutils.annotations.Projection;
 import org.openstreetmap.josm.testutils.mockers.ExtendedDialogMocker;
 import org.openstreetmap.josm.tools.Logging;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Unit tests of {@link OsmDataLayer} class.
  */
+@Main
+@Projection
 class OsmDataLayerTest {
-
-    /**
-     * Setup tests
-     */
-    @RegisterExtension
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD")
-    public JOSMTestRules test = new JOSMTestRules().projection().main();
-
     private DataSet ds;
     private OsmDataLayer layer;
 
@@ -244,15 +236,15 @@ class OsmDataLayerTest {
         Iterator<WayPoint> it = trackpoints.iterator();
         WayPoint p1 = it.next();
         assertEquals(new LatLon(47.0, 9.0), p1.getCoor());
-        assertEquals("123", p1.get(GpxConstants.PT_ELE));
+        assertEquals(123, (double) p1.get(GpxConstants.PT_ELE));
         assertEquals("2018-08-01T10:00:00Z", String.valueOf(p1.get(GpxConstants.PT_TIME)));
         WayPoint p2 = it.next();
         assertEquals(new LatLon(47.1, 9.1), p2.getCoor());
-        assertEquals("456", p2.get(GpxConstants.PT_ELE));
+        assertEquals(456, (double) p2.get(GpxConstants.PT_ELE));
         assertEquals("2018-08-01T10:01:00Z", String.valueOf(p2.get(GpxConstants.PT_TIME)));
         WayPoint p3 = it.next();
         assertEquals(new LatLon(47.05, 9.05), p3.getCoor());
-        assertEquals("789", p3.get(GpxConstants.PT_ELE));
+        assertEquals(789, (double) p3.get(GpxConstants.PT_ELE));
         assertEquals("2018-08-01T10:02:00Z", String.valueOf(p3.get(GpxConstants.PT_TIME)));
     }
 
