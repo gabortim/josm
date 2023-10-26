@@ -4,7 +4,9 @@ env:
   JAVAFX_VERSION: '17.0.7'
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - 'ticket_**'
 
 defaults:
   run:
