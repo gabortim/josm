@@ -49,7 +49,7 @@ import org.openstreetmap.josm.tools.Logging;
 
 /**
  * This is the model used by the history browser.
- *
+ * <p>
  * The model state consists of the following elements:
  * <ul>
  *   <li>the {@link History} of a specific {@link OsmPrimitive}</li>
@@ -58,7 +58,7 @@ import org.openstreetmap.josm.tools.Logging;
  * </ul>
  * {@link HistoryBrowser} always compares the {@link PointInTimeType#REFERENCE_POINT_IN_TIME} with the
  * {@link PointInTimeType#CURRENT_POINT_IN_TIME}.
-
+ * <p>
  * This model provides various {@link TableModel}s for {@link JTable}s used in {@link HistoryBrowser}, for
  * instance:
  * <ul>
@@ -174,10 +174,13 @@ public class HistoryBrowserModel extends ChangeNotifier implements ActiveLayerCh
     public void setHistory(History history) {
         boolean samePrimitive = isSamePrimitive(history); // needs to be before `this.history = history`
         this.history = history;
-        if (samePrimitive && history.getNumVersions() > 0) {
-            reference = history.getByVersion(reference.getVersion());
-            current = history.getByVersion(current.getVersion());
-        } else if (history.getNumVersions() > 0) {
+
+        if (!history.isEmpty()) {
+            if (samePrimitive) {
+                reference = history.getByVersion(reference.getVersion());
+                current = history.getByVersion(current.getVersion());
+            }
+
             HistoryOsmPrimitive newLatest = null;
             DataSet ds = MainApplication.getLayerManager().getActiveDataSet();
             if (ds != null) {
@@ -195,8 +198,7 @@ public class HistoryBrowserModel extends ChangeNotifier implements ActiveLayerCh
                 current = newLatest;
             }
             setLatest(newLatest);
-        }
-        if (!history.isEmpty()) {
+
             this.dateScale.setRange(
                     history.getEarliest().getInstant().toEpochMilli(),
                     history.getLatest().getInstant().toEpochMilli());

@@ -41,7 +41,7 @@ public abstract class KeyedItem extends TextItem {
     public String key; // NOSONAR
     /**
      * Allows to change the matching process, i.e., determining whether the tags of an OSM object fit into this preset.
-     * If a preset fits then it is linked in the Tags/Membership dialog.<ul>
+     * If a preset fits then it is linked in the Tags/Memberships dialog.<ul>
      * <li>none: neutral, i.e., do not consider this item for matching</li>
      * <li>key: positive if key matches, neutral otherwise</li>
      * <li>key!: positive if key matches, negative otherwise</li>

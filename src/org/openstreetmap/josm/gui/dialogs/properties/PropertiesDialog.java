@@ -309,7 +309,7 @@ implements DataSelectionListener, ActiveLayerChangeListener, PropertyChangeListe
         setupBlankSpaceMenu();
         setupKeyboardShortcuts();
 
-        // Let the actions know when selection in the tables change
+        // Let the actions know when selection in the tables changes
         tagTable.getSelectionModel().addListSelectionListener(editAction);
         membershipTable.getSelectionModel().addListSelectionListener(editAction);
         tagTable.getSelectionModel().addListSelectionListener(deleteAction);
