@@ -175,7 +175,7 @@ public class TagConflictResolverModel extends DefaultTableModel {
             decision.keepOne((String) value);
         } else if (value instanceof MultiValueDecisionType) {
             MultiValueDecisionType type = (MultiValueDecisionType) value;
-            switch(type) {
+            switch (type) {
             case KEEP_NONE:
                 decision.keepNone();
                 break;
@@ -275,7 +275,7 @@ public class TagConflictResolverModel extends DefaultTableModel {
     /**
      * Prepare the default decisions for the current model
      * @param fireEvent {@code true} to call {@code fireTableDataChanged} (can be a slow operation)
-     * @since 11626
+     * @since 11627
      */
     void prepareDefaultTagDecisions(boolean fireEvent) {
         for (MultiValueResolutionDecision decision: decisions.values()) {

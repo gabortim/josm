@@ -37,11 +37,13 @@ import javax.xml.stream.XMLStreamException;
 
 import org.openstreetmap.josm.data.preferences.ColorInfo;
 import org.openstreetmap.josm.data.preferences.JosmBaseDirectories;
+import org.openstreetmap.josm.data.preferences.JosmUrls;
 import org.openstreetmap.josm.data.preferences.NamedColorProperty;
 import org.openstreetmap.josm.data.preferences.PreferencesReader;
 import org.openstreetmap.josm.data.preferences.PreferencesWriter;
 import org.openstreetmap.josm.gui.MainApplication;
 import org.openstreetmap.josm.io.NetworkManager;
+import org.openstreetmap.josm.io.OsmApi;
 import org.openstreetmap.josm.spi.preferences.AbstractPreferences;
 import org.openstreetmap.josm.spi.preferences.Config;
 import org.openstreetmap.josm.spi.preferences.DefaultPreferenceChangeEvent;
@@ -910,6 +912,12 @@ public class Preferences extends AbstractPreferences {
             }
             modifiedDefault = false;
         }
+        // As of June 1st, 2024, the OSM.org instance no longer allows basic authentication.
+        if (JosmUrls.getInstance().getDefaultOsmApiUrl().equals(OsmApi.getOsmApi().getServerUrl()) && "basic".equals(OsmApi.getAuthMethod())) {
+            put("osm-server.auth-method", null);
+            put("osm-server.username", null);
+            put("osm-server.password", null);
+        }
     }
 
     /**
@@ -917,6 +925,7 @@ public class Preferences extends AbstractPreferences {
      * This should be removed sometime after 2024-06-01.
      */
     private void updateMapPaintKnownDefaults() {
+        final String mapPaintStyleEntriesPrefEntry = "mappaint.style.entries";
         final String url = "url";
         final String active = "active";
         final String potlatch2 = "resource://styles/standard/potlatch2.mapcss";
@@ -932,8 +941,13 @@ public class Preferences extends AbstractPreferences {
         knownDefaults.removeIf("resource://styles/standard/elemstyles.xml"::equals);
         putList("mappaint.style.known-defaults", knownDefaults);
 
+        // If the user hasn't set the entries, don't go through the removal process for potlatch 2. There is an issue
+        // where it may clear all paintstyles (done when the user has never touched the style settings).
+        if (!this.settingsMap.containsKey(mapPaintStyleEntriesPrefEntry)) {
+            return;
+        }
         // Replace potlatch2 in the current style entries, but only if it is enabled. Otherwise, remove it.
-        final List<Map<String, String>> styleEntries = new ArrayList<>(getListOfMaps("mappaint.style.entries"));
+        final List<Map<String, String>> styleEntries = new ArrayList<>(getListOfMaps(mapPaintStyleEntriesPrefEntry));
         final boolean potlatchEnabled = styleEntries.stream().filter(map -> potlatch2.equals(map.get(url)))
                 .anyMatch(map -> Boolean.parseBoolean(map.get(active)));
         final boolean remotePotlatch2Present = styleEntries.stream().anyMatch(map -> remotePotlatch2.equals(map.get(url)));
@@ -945,7 +959,7 @@ public class Preferences extends AbstractPreferences {
                 map.put(url, remotePotlatch2);
             }
         }
-        putListOfMaps("mappaint.style.entries", styleEntries.isEmpty() ? null : styleEntries);
+        putListOfMaps(mapPaintStyleEntriesPrefEntry, styleEntries);
     }
 
     /**

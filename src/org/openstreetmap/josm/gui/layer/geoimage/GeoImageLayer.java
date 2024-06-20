@@ -185,7 +185,7 @@ public class GeoImageLayer extends AbstractModifiableLayer implements
      * @since 18078
      */
     public GeoImageLayer(final List<ImageEntry> data, GpxData gpxData, final String name, boolean useThumbs) {
-        super(!Utils.isBlank(name) ? name : tr("Geotagged Images"));
+        super(!Utils.isStripEmpty(name) ? name : tr("Geotagged Images"));
         this.data = new ImageData(data);
         this.gpxData = gpxData;
         this.useThumbs = useThumbs;
@@ -743,12 +743,11 @@ public class GeoImageLayer extends AbstractModifiableLayer implements
 
         mapModeListener = (oldMapMode, newMapMode) -> {
             MapView mapView = MainApplication.getMap().mapView;
+            mapView.removeMouseListener(mouseAdapter);
+            mapView.removeMouseMotionListener(mouseMotionAdapter);
             if (newMapMode == null || isSupportedMapMode(newMapMode)) {
                 mapView.addMouseListener(mouseAdapter);
                 mapView.addMouseMotionListener(mouseMotionAdapter);
-            } else {
-                mapView.removeMouseListener(mouseAdapter);
-                mapView.removeMouseMotionListener(mouseMotionAdapter);
             }
         };
 

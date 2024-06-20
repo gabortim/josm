@@ -131,6 +131,11 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
     protected static final short FLAG_PRESERVED = 1 << 13;
 
     /**
+     * Determines if the primitive has all of its referrers
+     */
+    protected static final short FLAG_ALL_REFERRERS_DOWNLOADED = 1 << 14;
+
+    /**
      * Put several boolean flags to one short int field to save memory.
      * Other bits of this field are used in subclasses.
      */
@@ -304,7 +309,7 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
         this.changesetId = changesetId;
     }
 
-    @Deprecated
+    @Deprecated(since = "17749")
     @Override
     public void setTimestamp(Date timestamp) {
         this.timestamp = (int) TimeUnit.MILLISECONDS.toSeconds(timestamp.getTime());
@@ -320,7 +325,7 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
         this.timestamp = timestamp;
     }
 
-    @Deprecated
+    @Deprecated(since = "17749")
     @Override
     public Date getTimestamp() {
         return Date.from(getInstant());
@@ -381,6 +386,11 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
     }
 
     @Override
+    public void setReferrersDownloaded(boolean referrersDownloaded) {
+        this.updateFlags(FLAG_ALL_REFERRERS_DOWNLOADED, referrersDownloaded);
+    }
+
+    @Override
     public boolean isUndeleted() {
         return (flags & (FLAG_VISIBLE + FLAG_DELETED)) == 0;
     }
@@ -406,6 +416,51 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
     public void setDeleted(boolean deleted) {
         updateFlags(FLAG_DELETED, deleted);
         setModified(deleted ^ !isVisible());
+    }
+
+    @Override
+    public boolean hasDirectionKeys() {
+        return (flags & FLAG_HAS_DIRECTIONS) != 0;
+    }
+
+    @Override
+    public boolean reversedDirection() {
+        return (flags & FLAG_DIRECTION_REVERSED) != 0;
+    }
+
+    @Override
+    public boolean isTagged() {
+        return (flags & FLAG_TAGGED) != 0;
+    }
+
+    @Override
+    public boolean isAnnotated() {
+        return (flags & FLAG_ANNOTATED) != 0;
+    }
+
+    @Override
+    public boolean isHighlighted() {
+        return (flags & FLAG_HIGHLIGHTED) != 0;
+    }
+
+    @Override
+    public boolean isDisabled() {
+        return (flags & FLAG_DISABLED) != 0;
+    }
+
+    @Override
+    public boolean isDisabledAndHidden() {
+        return ((flags & FLAG_DISABLED) != 0) && ((flags & FLAG_HIDE_IF_DISABLED) != 0);
+    }
+
+    @Override
+    public boolean isPreserved() {
+        return (flags & FLAG_PRESERVED) != 0;
+    }
+
+    @Override
+    public boolean isReferrersDownloaded() {
+        return isNew() || (flags & FLAG_ALL_REFERRERS_DOWNLOADED) != 0;
     }
 
     /**
@@ -592,7 +647,7 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
         Map<String, String> originalKeys = getKeys();
         if (key == null || Utils.isStripEmpty(key))
             return;
-        else if (value == null) {
+        if (value == null) {
             remove(key);
         } else if (keys == null) {
             keys = new String[] {key, value};
@@ -628,7 +683,7 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
         Map<String, String> originalKeys = getKeys();
         List<Map.Entry<String, String>> tagsToAdd = new ArrayList<>(tags.size());
         for (Map.Entry<String, String> tag : tags.entrySet()) {
-            if (!Utils.isBlank(tag.getKey())) {
+            if (!Utils.isStripEmpty(tag.getKey())) {
                 int keyIndex = indexOfKey(newKeys, tag.getKey());
                 // Realistically, we will not hit the newKeys == null branch. If it is null, keyIndex is always < 0
                 if (keyIndex < 0 || newKeys == null) {
@@ -752,6 +807,7 @@ public abstract class AbstractPrimitive implements IPrimitive, IFilterablePrimit
     }
 
     @Override
+    @SuppressWarnings("PMD.UseArraysAsList") // See https://github.com/pmd/pmd/issues/5071
     public final Collection<String> keySet() {
         String[] tKeys = this.keys;
         if (tKeys == null) {

@@ -296,7 +296,7 @@ public final class DomainValidator extends AbstractValidator {
 
     // WARNING: this array MUST be sorted, otherwise it cannot be searched reliably using binary search
     private static final String[] GENERIC_TLDS = {
-        // Taken from Version 2023101900, Last Updated Thu Oct 19 07:07:01 2023 UTC
+        // Taken from Version 2024040900, Last Updated Tue Apr  9 07:07:01 2024 UTC
         "aaa", // aaa American Automobile Association, Inc.
         "aarp", // aarp AARP
         "abb", // abb ABB Ltd
@@ -368,14 +368,12 @@ public final class DomainValidator extends AbstractValidator {
         "author", // author Amazon Registry Services, Inc.
         "auto", // auto Uniregistry, Corp.
         "autos", // autos DERAutos, LLC
-        "avianca", // avianca Aerovias del Continente Americano S.A. Avianca
         "aws", // aws Amazon Registry Services, Inc.
         "axa", // axa AXA SA
         "azure", // azure Microsoft Corporation
         "baby", // baby Johnson &amp; Johnson Services, Inc.
         "baidu", // baidu Baidu, Inc.
         "banamex", // banamex Citigroup Inc.
-        "bananarepublic", // bananarepublic The Gap, Inc.
         "band", // band United TLD Holdco, Ltd
         "bank", // bank fTLD Registry Services, LLC
         "bar", // bar Punto 2012 Sociedad Anonima Promotora de Inversion de Capital Variable
@@ -510,7 +508,6 @@ public final class DomainValidator extends AbstractValidator {
         "college", // college XYZ.COM LLC
         "cologne", // cologne NetCologne Gesellschaft für Telekommunikation mbH
         "com", // com VeriSign Global Registry Services
-        "comcast", // comcast Comcast IP Holdings I, LLC
         "commbank", // commbank COMMONWEALTH BANK OF AUSTRALIA
         "community", // community Fox Orchard, LLC
         "company", // company Silver Avenue, LLC
@@ -718,7 +715,6 @@ public final class DomainValidator extends AbstractValidator {
         "gripe", // gripe Corn Sunset, LLC
         "grocery", // grocery Wal-Mart Stores, Inc.
         "group", // group Romeo Town, LLC
-        "guardian", // guardian The Guardian Life Insurance Company of America
         "gucci", // gucci Guccio Gucci S.p.a.
         "guge", // guge Charleston Road Registry Inc.
         "guide", // guide Snow Moon, LLC
@@ -945,7 +941,6 @@ public final class DomainValidator extends AbstractValidator {
         "nab", // nab National Australia Bank Limited
         "nagoya", // nagoya GMO Registry, Inc.
         "name", // name VeriSign Information Services, Inc.
-        "natura", // natura NATURA COSMÉTICOS S.A.
         "navy", // navy United TLD Holdco Ltd.
         "nba", // nba NBA REGISTRY, LLC
         "nec", // nec NEC Corporation
@@ -983,7 +978,6 @@ public final class DomainValidator extends AbstractValidator {
         "okinawa", // okinawa BusinessRalliart inc.
         "olayan", // olayan Crescent Holding GmbH
         "olayangroup", // olayangroup Crescent Holding GmbH
-        "oldnavy", // oldnavy The Gap, Inc.
         "ollo", // ollo Dish DBS Corporation
         "omega", // omega The Swatch Group Ltd
         "one", // one One.com A/S
@@ -1120,7 +1114,6 @@ public final class DomainValidator extends AbstractValidator {
         "saxo", // saxo Saxo Bank A/S
         "sbi", // sbi STATE BANK OF INDIA
         "sbs", // sbs SPECIAL BROADCASTING SERVICE CORPORATION
-        "sca", // sca SVENSKA CELLULOSA AKTIEBOLAGET SCA (publ)
         "scb", // scb The Siam Commercial Bank Public Company Limited (&quot;SCB&quot;)
         "schaeffler", // schaeffler Schaeffler Technologies AG &amp; Co. KG
         "schmidt", // schmidt SALM S.A.S.
@@ -1332,7 +1325,6 @@ public final class DomainValidator extends AbstractValidator {
         "wtf", // wtf Hidden Way, LLC
         "xbox", // xbox Microsoft Corporation
         "xerox", // xerox Xerox DNHC LLC
-        "xfinity", // xfinity Comcast IP Holdings I, LLC
         "xihuan", // xihuan QIHOO 360 TECHNOLOGY CO. LTD.
         "xin", // xin Elegant Leader Limited
         "xn--11b4c3d", // कॉम VeriSign Sarl
@@ -1859,7 +1851,7 @@ public final class DomainValidator extends AbstractValidator {
                 .map(tld -> tld.toLowerCase(Locale.ENGLISH))
                 .toArray(String[]::new);
         Arrays.sort(copy);
-        switch(table) {
+        switch (table) {
         case COUNTRY_CODE_MINUS:
             countryCodeTLDsMinus = copy;
             break;
@@ -1891,7 +1883,7 @@ public final class DomainValidator extends AbstractValidator {
      */
     public static String[] getTLDEntries(ArrayType table) {
         final String[] array;
-        switch(table) {
+        switch (table) {
         case COUNTRY_CODE_MINUS:
             array = countryCodeTLDsMinus;
             break;
@@ -1949,7 +1941,7 @@ public final class DomainValidator extends AbstractValidator {
             //            (ideographic full stop), U+FF0E (fullwidth full stop), U+FF61
             //            (halfwidth ideographic full stop).
             char lastChar = input.charAt(length-1); // fetch original last char
-            switch(lastChar) {
+            switch (lastChar) {
                 case '.':      // "." full stop, AKA U+002E
                 case '\u3002': // ideographic full stop
                 case '\uFF0E': // fullwidth full stop
@@ -1964,7 +1956,7 @@ public final class DomainValidator extends AbstractValidator {
         }
     }
 
-    private static class IdnBugHolder {
+    private static final class IdnBugHolder {
         private static boolean keepsTrailingDot() {
             final String input = "a."; // must be a valid name
             return input.equals(IDN.toASCII(input));

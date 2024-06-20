@@ -27,10 +27,13 @@ import org.openstreetmap.josm.tools.Utils;
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @ExtendWith(ProjectionNadGrids.NadGridsExtension.class)
 public @interface ProjectionNadGrids {
+    /**
+     * Set up the NAD grids for testing
+     */
     class NadGridsExtension implements BeforeEachCallback {
         @Override
         public void beforeEach(ExtensionContext extensionContext) throws Exception {
-            if (Utils.isBlank(Utils.getSystemProperty("PROJ_LIB"))) {
+            if (Utils.isStripEmpty(Utils.getSystemProperty("PROJ_LIB"))) {
                 Utils.updateSystemProperty("PROJ_LIB", Paths.get("nodist", "data", "projection").toString());
             }
             MainApplication.setupNadGridSources();

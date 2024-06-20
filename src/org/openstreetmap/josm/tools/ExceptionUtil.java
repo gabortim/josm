@@ -297,7 +297,7 @@ public final class ExceptionUtil {
                 + "Authentication at the OSM server with the OAuth token ''{0}'' failed.<br>"
                 + "Please launch the preferences dialog and retrieve another OAuth token."
                 + "</html>",
-                OAuthAccessTokenHolder.getInstance().getAccessTokenKey()
+                OAuthAccessTokenHolder.getInstance().getAccessToken(e.getUrl(), OsmApi.getAuthMethodVersion())
         );
     }
 
@@ -343,7 +343,7 @@ public final class ExceptionUtil {
                 + "''{1}''.<br>"
                 + "Please launch the preferences dialog and retrieve another OAuth token."
                 + "</html>",
-                OAuthAccessTokenHolder.getInstance().getAccessTokenKey(),
+                OAuthAccessTokenHolder.getInstance().getAccessToken(e.getUrl(), OsmApi.getAuthMethodVersion()),
                 e.getAccessedUrl() == null ? tr("unknown") : e.getAccessedUrl()
         );
     }
@@ -460,7 +460,7 @@ public final class ExceptionUtil {
      */
     public static String explainGeneric(Exception e) {
         String msg = e.getMessage();
-        if (Utils.isBlank(msg)) {
+        if (Utils.isStripEmpty(msg)) {
             msg = e.toString();
         }
         Logging.error(e);

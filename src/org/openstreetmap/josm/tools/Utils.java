@@ -1,6 +1,7 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.tools;
 
+import static java.util.function.Predicate.not;
 import static org.openstreetmap.josm.tools.I18n.marktr;
 import static org.openstreetmap.josm.tools.I18n.tr;
 import static org.openstreetmap.josm.tools.I18n.trn;
@@ -8,14 +9,12 @@ import static org.openstreetmap.josm.tools.I18n.trn;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
 import java.awt.font.GlyphVector;
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -90,6 +89,9 @@ public final class Utils {
 
     private static final Pattern REMOVE_DIACRITICS = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
+    private static final Pattern PATTERN_LENGTH = Pattern.compile("^(-?\\d+(?:\\.\\d+)?)(cm|mi|mm|m|ft|km|nmi|in|'|\")?$");
+    private static final Pattern PATTERN_LENGTH2 = Pattern.compile("^(-?)(\\d+(?:\\.\\d+)?)(ft|')(\\d+(?:\\.\\d+)?)(in|\")?$");
+
     private static final String DEFAULT_STRIP = "\uFEFF\u200B";
 
     private static final String[] SIZE_UNITS = {"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
@@ -97,22 +99,6 @@ public final class Utils {
     // Constants backported from Java 9, see https://bugs.openjdk.java.net/browse/JDK-4477961
     private static final double TO_DEGREES = 180.0 / Math.PI;
     private static final double TO_RADIANS = Math.PI / 180.0;
-
-    /**
-     * A reference to {@code Map.ofEntries()} available since Java 9
-     */
-    static final Method mapOfEntries = mapOfEntriesMethod();
-
-    private static Method mapOfEntriesMethod() {
-        if (getJavaVersion() >= 9) {
-            try {
-                return Map.class.getMethod("ofEntries", Map.Entry[].class);
-            } catch (NoSuchMethodException noSuchMethodException) {
-                Logging.trace(noSuchMethodException);
-            }
-        }
-        return null;
-    }
 
     private Utils() {
         // Hide default constructor for utils classes
@@ -168,7 +154,7 @@ public final class Utils {
      * @param data Message parameters, optional
      * @throws AssertionError if the condition is not met
      */
-    public static void ensure(boolean condition, String message, Object...data) {
+    public static void ensure(boolean condition, String message, Object... data) {
         if (!condition)
             throw new AssertionError(
                     MessageFormat.format(message, data)
@@ -201,7 +187,7 @@ public final class Utils {
      * @return null if values is null. The joined string otherwise.
      * @deprecated since 15718, use {@link String#join} or {@link Collectors#joining}
      */
-    @Deprecated
+    @Deprecated(since = "15718", forRemoval = true)
     public static String join(String sep, Collection<?> values) {
         CheckParameterUtil.ensureParameterNotNull(sep, "sep");
         if (values == null)
@@ -345,11 +331,7 @@ public final class Utils {
      * @since 10569
      */
     public static boolean deleteFileIfExists(File file) {
-        if (file.exists()) {
-            return deleteFile(file);
-        } else {
-            return true;
-        }
+        return !file.exists() || deleteFile(file);
     }
 
     /**
@@ -535,7 +517,7 @@ public final class Utils {
      * Topological sort.
      * @param <T> type of items
      *
-     * @param dependencies contains mappings (key -&gt; value). In the final list of sorted objects, the key will come
+     * @param dependencies contains mappings (key → value). In the final list of sorted objects, the key will come
      * after the value. (In other words, the key depends on the value(s).)
      * There must not be cyclic dependencies.
      * @return the list of sorted objects
@@ -586,7 +568,7 @@ public final class Utils {
      * @return the transformed unmodifiable collection
      */
     public static <A, B> Collection<B> transform(final Collection<? extends A> c, final Function<A, B> f) {
-        return new AbstractCollection<B>() {
+        return new AbstractCollection<>() {
 
             @Override
             public int size() {
@@ -595,7 +577,7 @@ public final class Utils {
 
             @Override
             public Iterator<B> iterator() {
-                return new Iterator<B>() {
+                return new Iterator<>() {
 
                     private final Iterator<? extends A> it = c.iterator();
 
@@ -628,7 +610,7 @@ public final class Utils {
      * @return the transformed unmodifiable list
      */
     public static <A, B> List<B> transform(final List<? extends A> l, final Function<A, B> f) {
-        return new AbstractList<B>() {
+        return new AbstractList<>() {
 
             @Override
             public int size() {
@@ -653,6 +635,8 @@ public final class Utils {
      */
     @SuppressWarnings("unchecked")
     public static <T> List<T> toUnmodifiableList(Collection<T> collection) {
+        // Note: Windows does a `null` check on startup on these lists. See #23717.
+        // Only change this once that is fixed.
         // Java 9: use List.of(...)
         if (isEmpty(collection)) {
             return Collections.emptyList();
@@ -681,15 +665,9 @@ public final class Utils {
         } else if (map.size() == 1) {
             final Map.Entry<K, V> entry = map.entrySet().iterator().next();
             return Collections.singletonMap(entry.getKey(), entry.getValue());
-        } else if (mapOfEntries != null) {
-            try {
-                // Java 9: use Map.ofEntries(...)
-                return (Map<K, V>) mapOfEntries.invoke(null, (Object) map.entrySet().toArray(new Map.Entry[0]));
-            } catch (ReflectiveOperationException toLog) {
-                Logging.trace(toLog);
-            }
         }
-        return Collections.unmodifiableMap(map);
+        // Map.copyOf would also work, but if the original map is immutable, it just returns the original map.
+        return Map.ofEntries(map.entrySet().toArray(new Map.Entry[0]));
     }
 
     /**
@@ -737,9 +715,11 @@ public final class Utils {
      * @param string string
      * @return {@code true} if string is null or blank
      * @since 18208
+     * @deprecated use {@link #isStripEmpty(String)} or {@link String#isBlank()} instead
      */
+    @Deprecated(since = "19080", forRemoval = true)
     public static boolean isBlank(String string) {
-        return string == null || strip(string).isEmpty();
+        return isStripEmpty(string);
     }
 
     /**
@@ -751,7 +731,7 @@ public final class Utils {
      */
     public static String firstNotEmptyString(String defaultString, String... candidates) {
         return Arrays.stream(candidates)
-                .filter(candidate -> !Utils.isStripEmpty(candidate))
+                .filter(not(Utils::isStripEmpty))
                 .findFirst().orElse(defaultString);
     }
 
@@ -763,7 +743,14 @@ public final class Utils {
      * @since 11435
      */
     public static boolean isStripEmpty(String str) {
-        return str == null || IntStream.range(0, str.length()).allMatch(i -> isStrippedChar(str.charAt(i), null));
+        if (str != null && !str.isBlank()) {
+            for (int i = 0; i < str.length(); i++) {
+                if (!isStrippedChar(str.charAt(i), null)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -836,7 +823,7 @@ public final class Utils {
 
     /**
      * Runs an external command and returns the standard output.
-     *
+     * <p>
      * The program is expected to execute fast, as this call waits 10 seconds at most.
      *
      * @param command the command with arguments
@@ -892,7 +879,7 @@ public final class Utils {
         if (tmpDir == null) {
             return null;
         }
-        File josmTmpDir = new File(tmpDir, "JOSM");
+        final File josmTmpDir = new File(tmpDir, "JOSM");
         if (!josmTmpDir.exists() && !josmTmpDir.mkdirs()) {
             Logging.warn("Unable to create temp directory " + josmTmpDir);
         }
@@ -978,8 +965,8 @@ public final class Utils {
             } else if (cnt == 0) {
                 sb.append(',').append(cur);
             } else {
-                sb.append('-').append(last);
-                sb.append(',').append(cur);
+                sb.append('-').append(last)
+                  .append(',').append(cur);
                 cnt = 0;
             }
             last = cur;
@@ -1015,10 +1002,9 @@ public final class Utils {
      * @return null if <code>o</code> is null or the type <code>o</code> is not
      *  a subclass of <code>klass</code>. The casted value otherwise.
      */
-    @SuppressWarnings("unchecked")
     public static <T> T cast(Object o, Class<T> klass) {
         if (klass.isInstance(o)) {
-            return (T) o;
+            return klass.cast(o);
         }
         return null;
     }
@@ -1116,7 +1102,7 @@ public final class Utils {
     /**
      * Fixes URL with illegal characters in the query (and fragment) part by
      * percent encoding those characters.
-     *
+     * <p>
      * special characters like &amp; and # are not encoded
      *
      * @param url the URL that should be fixed
@@ -1126,12 +1112,12 @@ public final class Utils {
         if (url == null || url.indexOf('?') == -1)
             return url;
 
-        String query = url.substring(url.indexOf('?') + 1);
+        final String query = url.substring(url.indexOf('?') + 1);
 
-        StringBuilder sb = new StringBuilder(url.substring(0, url.indexOf('?') + 1));
+        final StringBuilder sb = new StringBuilder(url.substring(0, url.indexOf('?') + 1));
 
         for (int i = 0; i < query.length(); i++) {
-            String c = query.substring(i, i + 1);
+            final String c = query.substring(i, i + 1);
             if (URL_CHARS.contains(c)) {
                 sb.append(c);
             } else {
@@ -1397,7 +1383,7 @@ public final class Utils {
      */
     @SuppressWarnings("ThreadPriorityCheck")
     public static ForkJoinPool newForkJoinPool(String pref, final String nameFormat, final int threadPriority) {
-        int noThreads = Config.getPref().getInt(pref, Runtime.getRuntime().availableProcessors());
+        final int noThreads = Config.getPref().getInt(pref, Runtime.getRuntime().availableProcessors());
         return new ForkJoinPool(noThreads, new ForkJoinPool.ForkJoinWorkerThreadFactory() {
             final AtomicLong count = new AtomicLong(0);
             @Override
@@ -1516,29 +1502,14 @@ public final class Utils {
      * @param stream input stream
      * @return byte array of data in input stream (empty if stream is null)
      * @throws IOException if any I/O error occurs
+     * @deprecated since 19050 -- use {@link InputStream#readAllBytes()} instead
      */
+    @Deprecated(since = "19050", forRemoval = true)
     public static byte[] readBytesFromStream(InputStream stream) throws IOException {
-        // TODO: remove this method when switching to Java 11 and use InputStream.readAllBytes
         if (stream == null) {
             return new byte[0];
         }
-        try (ByteArrayOutputStream bout = new ByteArrayOutputStream(stream.available())) {
-            byte[] buffer = new byte[8192];
-            boolean finished = false;
-            do {
-                int read = stream.read(buffer);
-                if (read >= 0) {
-                    bout.write(buffer, 0, read);
-                } else {
-                    finished = true;
-                }
-            } while (!finished);
-            if (bout.size() == 0)
-                return new byte[0];
-            return bout.toByteArray();
-        } finally {
-            stream.close();
-        }
+        return stream.readAllBytes();
     }
 
     /**
@@ -1602,19 +1573,19 @@ public final class Utils {
      * @return a list of GlyphVectors
      */
     public static List<GlyphVector> getGlyphVectorsBidi(String string, Font font, FontRenderContext frc) {
-        List<GlyphVector> gvs = new ArrayList<>();
-        Bidi bidi = new Bidi(string, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
-        byte[] levels = new byte[bidi.getRunCount()];
-        DirectionString[] dirStrings = new DirectionString[levels.length];
+        final List<GlyphVector> gvs = new ArrayList<>();
+        final Bidi bidi = new Bidi(string, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
+        final byte[] levels = new byte[bidi.getRunCount()];
+        final DirectionString[] dirStrings = new DirectionString[levels.length];
         for (int i = 0; i < levels.length; ++i) {
             levels[i] = (byte) bidi.getRunLevel(i);
-            String substr = string.substring(bidi.getRunStart(i), bidi.getRunLimit(i));
-            int dir = levels[i] % 2 == 0 ? Bidi.DIRECTION_LEFT_TO_RIGHT : Bidi.DIRECTION_RIGHT_TO_LEFT;
+            final String substr = string.substring(bidi.getRunStart(i), bidi.getRunLimit(i));
+            final int dir = levels[i] % 2 == 0 ? Bidi.DIRECTION_LEFT_TO_RIGHT : Bidi.DIRECTION_RIGHT_TO_LEFT;
             dirStrings[i] = new DirectionString(dir, substr);
         }
         Bidi.reorderVisually(levels, 0, dirStrings, 0, levels.length);
         for (DirectionString dirString : dirStrings) {
-            char[] chars = dirString.str.toCharArray();
+            final char[] chars = dirString.str.toCharArray();
             gvs.add(font.layoutGlyphVector(frc, chars, 0, chars.length, dirString.direction));
         }
         return gvs;
@@ -1646,11 +1617,8 @@ public final class Utils {
             throw new IllegalArgumentException(MessageFormat.format("Parameter min ({0}) cannot be greater than max ({1})", min, max));
         } else if (val < min) {
             return min;
-        } else if (val > max) {
-            return max;
-        } else {
-            return val;
         }
+        return Math.min(val, max);
     }
 
     /**
@@ -1814,15 +1782,10 @@ public final class Utils {
                             "java.baseline.version.url",
                             Config.getUrls().getJOSMWebsite() + "/remote/oracle-java-update-baseline.version")))
                     .connect().fetchContent().split("\n", -1);
-            if (getJavaVersion() <= 11 && isRunningWebStart()) { // OpenWebStart currently only has Java 11
+            // OpenWebStart currently only has Java 21
+            if (getJavaVersion() <= 21) {
                 for (String version : versions) {
-                    if (version.startsWith("11")) {
-                        return version;
-                    }
-                }
-            } else if (getJavaVersion() <= 17) {
-                for (String version : versions) {
-                    if (version.startsWith("17")) { // Use current Java LTS
+                    if (version.startsWith("21")) { // Use current Java LTS
                         return version;
                     }
                 }
@@ -1862,7 +1825,9 @@ public final class Utils {
      * Determines whether JOSM has been started via Oracle Java Web Start.
      * @return true if JOSM has been started via Oracle Java Web Start
      * @since 15740
+     * @deprecated JOSM no longer supports Oracle Java Webstart since Oracle Java Webstart doesn't support Java 9+.
      */
+    @Deprecated(since = "19101", forRemoval = true)
     public static boolean isRunningJavaWebStart() {
         return isRunningWebStart() && isClassFound("com.sun.javaws.Main");
     }
@@ -1880,7 +1845,7 @@ public final class Utils {
     /**
      * Get a function that converts an object to a singleton stream of a certain
      * class (or null if the object cannot be cast to that class).
-     *
+     * <p>
      * Can be useful in relation with streams, but be aware of the performance
      * implications of creating a stream for each element.
      * @param <T> type of the objects to convert
@@ -1905,10 +1870,9 @@ public final class Utils {
      * @param consumer action to take when o is and instance of T
      * @since 12604
      */
-    @SuppressWarnings("unchecked")
     public static <T> void instanceOfThen(Object o, Class<T> klass, Consumer<? super T> consumer) {
         if (klass.isInstance(o)) {
-            consumer.accept((T) o);
+            consumer.accept(klass.cast(o));
         }
     }
 
@@ -1921,10 +1885,9 @@ public final class Utils {
      * @return {@link Optional} containing the result of the cast, if it is possible, an empty
      * Optional otherwise
      */
-    @SuppressWarnings("unchecked")
     public static <T> Optional<T> instanceOfAndCast(Object o, Class<T> klass) {
         if (klass.isInstance(o))
-            return Optional.of((T) o);
+            return Optional.of(klass.cast(o));
         return Optional.empty();
     }
 
@@ -1944,7 +1907,7 @@ public final class Utils {
                 try {
                     return url.openStream();
                 } catch (FileNotFoundException | InvalidPathException e) {
-                    URL betterUrl = betterJarUrl(url);
+                    final URL betterUrl = betterJarUrl(url);
                     if (betterUrl != null) {
                         try {
                             return betterUrl.openStream();
@@ -1985,11 +1948,11 @@ public final class Utils {
         if (urlPath.startsWith("file:/") && urlPath.split("!", -1).length > 2) {
             // Locate jar file
             int index = urlPath.lastIndexOf("!/");
-            Path jarFile = Paths.get(urlPath.substring("file:/".length(), index));
+            final Path jarFile = Paths.get(urlPath.substring("file:/".length(), index));
             Path filename = jarFile.getFileName();
             FileTime jarTime = Files.readAttributes(jarFile, BasicFileAttributes.class).lastModifiedTime();
             // Copy it to temp directory (hopefully free of exclamation mark) if needed (missing or older jar)
-            Path jarCopy = Paths.get(getSystemProperty("java.io.tmpdir")).resolve(filename);
+            final Path jarCopy = Paths.get(getSystemProperty("java.io.tmpdir")).resolve(filename);
             if (!jarCopy.toFile().exists() ||
                     Files.readAttributes(jarCopy, BasicFileAttributes.class).lastModifiedTime().compareTo(jarTime) < 0) {
                 Files.copy(jarFile, jarCopy, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
@@ -2028,7 +1991,7 @@ public final class Utils {
             Logging.error("Cannot open {0}: {1}", path, e.getMessage());
             Logging.trace(e);
             try {
-                URL betterUrl = betterJarUrl(cl.getResource(path));
+                final URL betterUrl = betterJarUrl(cl.getResource(path));
                 if (betterUrl != null) {
                     return betterUrl.openStream();
                 }
@@ -2063,5 +2026,55 @@ public final class Utils {
      */
     public static String intern(String string) {
         return string == null ? null : string.intern();
+    }
+
+    /**
+     * Convert a length unit to meters
+     * @param s arbitrary string representing a length
+     * @return the length converted to meters
+     * @throws IllegalArgumentException if input is no valid length
+     * @since 19089
+     */
+    public static Double unitToMeter(String s) throws IllegalArgumentException {
+        s = s.replace(" ", "").replace(",", ".");
+        Matcher m = PATTERN_LENGTH.matcher(s);
+        if (m.matches()) {
+            return Double.parseDouble(m.group(1)) * unitToMeterConversion(m.group(2));
+        } else {
+            m = PATTERN_LENGTH2.matcher(s);
+            if (m.matches()) {
+                /* NOTE: we assume -a'b" means -(a'+b") and not (-a')+b" - because of such issues SI units have been invented
+                   and have been adopted by the majority of the world */
+                return (Double.parseDouble(m.group(2))*0.3048+Double.parseDouble(m.group(4))*0.0254)*(m.group(1).isEmpty() ? 1.0 : -1.0);
+            }
+        }
+        throw new IllegalArgumentException("Invalid length value: " + s);
+    }
+
+    /**
+     * Get the conversion factor for a specified unit to meters
+     * @param unit The unit to convert to meters
+     * @return The conversion factor or 1.
+     * @throws IllegalArgumentException if the unit does not currently have a conversion
+     */
+    private static double unitToMeterConversion(String unit) throws IllegalArgumentException {
+        if (unit == null) {
+            return 1;
+        }
+        switch (unit) {
+            case "cm": return 0.01;
+            case "mm": return 0.001;
+            case "m": return 1;
+            case "km": return 1000.0;
+            case "nmi": return 1852.0;
+            case "mi": return 1609.344;
+            case "ft":
+            case "'":
+                return 0.3048;
+            case "in":
+            case "\"":
+                return 0.0254;
+            default: throw new IllegalArgumentException("Invalid length unit: " + unit);
+        }
     }
 }

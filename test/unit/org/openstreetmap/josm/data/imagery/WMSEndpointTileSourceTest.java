@@ -67,13 +67,14 @@ class WMSEndpointTileSourceTest implements TileSourceTest {
                         )
                 );
 
-        tileServer.stubFor(WireMock.get(WireMock.urlEqualTo("//maps")).willReturn(WireMock.aResponse().withBody(
+        tileServer.stubFor(WireMock.get(WireMock.urlEqualTo("/other/maps")).willReturn(WireMock.aResponse().withBody(
                 "<?xml version='1.0' encoding='UTF-8'?>\n" +
                 "<imagery xmlns=\"http://josm.openstreetmap.de/maps-1.0\">\n" +
                 "<entry>\n" +
                 "<name>OSM Inspector: Geometry</name>\n" +
                 "<id>OSM_Inspector-Geometry</id>\n" +
                 "<type>wms_endpoint</type>\n" +
+                "<category>qa</category>\n" +
                 "<url><![CDATA[" + tileServer.url("/capabilities") + "]]></url>\n" +
                 "<icon>data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsSAAALEgHS3X78AAAB5UlEQVQ4y4WTwWsTURDG" +
                 "fy8W1yYmXZOqtGJJFyGw6KF7CEigwYuS0kthrYUi4i0iORS9BU9hQdA/ILcixVBrwENKLz1FUBB0wWOwYFAqxUNYTZq6BfM8yC5d05iBObz3vfnmm3kz4sqDh/zP" +
@@ -93,7 +94,7 @@ class WMSEndpointTileSourceTest implements TileSourceTest {
                 "</imagery>"
                 )));
 
-        Config.getPref().putList("imagery.layers.sites", Collections.singletonList(tileServer.url("//maps")));
+        Config.getPref().putList("imagery.layers.sites", Collections.singletonList(tileServer.url("/other/maps")));
         ImageryLayerInfo.instance.loadDefaults(true, null, false);
         assertEquals(1, ImageryLayerInfo.instance.getDefaultLayers().size());
         ImageryInfo wmsImageryInfo = ImageryLayerInfo.instance.getDefaultLayers().get(0);
@@ -116,7 +117,7 @@ class WMSEndpointTileSourceTest implements TileSourceTest {
                         )
                 );
 
-        tileServer.stubFor(WireMock.get(WireMock.urlEqualTo("//maps")).willReturn(WireMock.aResponse().withBody(
+        tileServer.stubFor(WireMock.get(WireMock.urlEqualTo("/other/maps")).willReturn(WireMock.aResponse().withBody(
                 "<?xml version='1.0' encoding='UTF-8'?>\n" +
                 "<imagery xmlns=\"http://josm.openstreetmap.de/maps-1.0\">\n" +
                 "  <entry>\n" +
@@ -124,6 +125,7 @@ class WMSEndpointTileSourceTest implements TileSourceTest {
                 "        <name lang=\"nb\">Norge i Bilder (historisk)</name>\n" +
                 "        <id>geovekst-nib-historic</id>\n" +
                 "        <type>wms_endpoint</type>\n" +
+                "        <category>photo</category>\n" +
                 "        <country-code>NO</country-code>\n" +
                 "        <description lang=\"en\">Historic Norwegian orthophotos and maps, courtesy of Geovekst and Norkart.</description>\n" +
                 "        <url><![CDATA[" + tileServer.url("/capabilities?SERVICE=WMS&REQUEST=GetCapabilities") + "]]></url>\n" +
@@ -138,7 +140,7 @@ class WMSEndpointTileSourceTest implements TileSourceTest {
                 "</imagery>"
                 )));
 
-        Config.getPref().putList("imagery.layers.sites", Collections.singletonList(tileServer.url("//maps")));
+        Config.getPref().putList("imagery.layers.sites", Collections.singletonList(tileServer.url("/other/maps")));
         ImageryLayerInfo.instance.loadDefaults(true, null, false);
         ImageryInfo wmsImageryInfo = ImageryLayerInfo.instance.getDefaultLayers().get(0);
         wmsImageryInfo.setDefaultLayers(Collections.singletonList(new DefaultLayer(ImageryType.WMS_ENDPOINT, "historiske-ortofoto", "", "")));

@@ -1,6 +1,7 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.io;
 
+import static org.openstreetmap.josm.tools.I18n.marktr;
 import static org.openstreetmap.josm.tools.I18n.tr;
 import static org.openstreetmap.josm.tools.I18n.trn;
 
@@ -51,6 +52,8 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import jakarta.annotation.Nullable;
+
 /**
  * Class that encapsulates the communications with the <a href="http://wiki.openstreetmap.org/wiki/API_v0.6">OSM API</a>.<br><br>
  *
@@ -61,6 +64,9 @@ import org.xml.sax.SAXParseException;
  * @since 1523
  */
 public class OsmApi extends OsmConnection {
+    private static final String CHANGESET_STR = "changeset";
+    private static final String CHANGESET_SLASH = "changeset/";
+    private static final String ERROR_MESSAGE = marktr("Changeset ID > 0 expected. Got {0}.");
 
     /**
      * Maximum number of retries to send a request in case of HTTP 500 errors or timeouts
@@ -84,8 +90,6 @@ public class OsmApi extends OsmConnection {
     private static final Map<String, OsmApi> instances = new HashMap<>();
 
     private static final ListenerList<OsmApiInitializationListener> listeners = ListenerList.create();
-    /** This is used to make certain we have set osm-server.auth-method to the "right" default */
-    private static boolean oauthCompatibilitySwitch;
 
     private URL url;
 
@@ -464,7 +468,7 @@ public class OsmApi extends OsmConnection {
      * @throws IllegalArgumentException if changeset is null
      */
     public void openChangeset(Changeset changeset, ProgressMonitor progressMonitor) throws OsmTransferException {
-        CheckParameterUtil.ensureParameterNotNull(changeset, "changeset");
+        CheckParameterUtil.ensureParameterNotNull(changeset, CHANGESET_STR);
         try {
             progressMonitor.beginTask(tr("Creating changeset..."));
             initialize(progressMonitor);
@@ -495,17 +499,17 @@ public class OsmApi extends OsmConnection {
      *
      */
     public void updateChangeset(Changeset changeset, ProgressMonitor monitor) throws OsmTransferException {
-        CheckParameterUtil.ensureParameterNotNull(changeset, "changeset");
+        CheckParameterUtil.ensureParameterNotNull(changeset, CHANGESET_STR);
         if (monitor == null) {
             monitor = NullProgressMonitor.INSTANCE;
         }
         if (changeset.getId() <= 0)
-            throw new IllegalArgumentException(tr("Changeset ID > 0 expected. Got {0}.", changeset.getId()));
+            throw new IllegalArgumentException(tr(ERROR_MESSAGE, changeset.getId()));
         try {
             monitor.beginTask(tr("Updating changeset..."));
             initialize(monitor);
             monitor.setCustomText(tr("Updating changeset {0}...", changeset.getId()));
-            sendPutRequest("changeset/" + changeset.getId(), toXml(changeset), monitor);
+            sendPutRequest(CHANGESET_SLASH + changeset.getId(), toXml(changeset), monitor);
         } catch (ChangesetClosedException e) {
             e.setSource(ChangesetClosedException.Source.UPDATE_CHANGESET);
             throw e;
@@ -530,17 +534,17 @@ public class OsmApi extends OsmConnection {
      * @throws IllegalArgumentException if changeset.getId() &lt;= 0
      */
     public void closeChangeset(Changeset changeset, ProgressMonitor monitor) throws OsmTransferException {
-        CheckParameterUtil.ensureParameterNotNull(changeset, "changeset");
+        CheckParameterUtil.ensureParameterNotNull(changeset, CHANGESET_STR);
         if (monitor == null) {
             monitor = NullProgressMonitor.INSTANCE;
         }
         if (changeset.getId() <= 0)
-            throw new IllegalArgumentException(tr("Changeset ID > 0 expected. Got {0}.", changeset.getId()));
+            throw new IllegalArgumentException(tr(ERROR_MESSAGE, changeset.getId()));
         try {
             monitor.beginTask(tr("Closing changeset..."));
             initialize(monitor);
             // send "\r\n" instead of empty string, so we don't send zero payload - workaround bugs in proxy software
-            sendPutRequest("changeset/" + changeset.getId() + "/close", "\r\n", monitor);
+            sendPutRequest(CHANGESET_SLASH + changeset.getId() + "/close", "\r\n", monitor);
         } catch (ChangesetClosedException e) {
             e.setSource(ChangesetClosedException.Source.CLOSE_CHANGESET);
             throw e;
@@ -564,8 +568,8 @@ public class OsmApi extends OsmConnection {
         if (changeset.isOpen())
             throw new IllegalArgumentException(tr("Changeset must be closed in order to add a comment"));
         else if (changeset.getId() <= 0)
-            throw new IllegalArgumentException(tr("Changeset ID > 0 expected. Got {0}.", changeset.getId()));
-        sendRequest("POST", "changeset/" + changeset.getId() + "/comment?text="+ Utils.encodeUrl(comment),
+            throw new IllegalArgumentException(tr(ERROR_MESSAGE, changeset.getId()));
+        sendRequest("POST", CHANGESET_SLASH + changeset.getId() + "/comment?text="+ Utils.encodeUrl(comment),
                 null, monitor, "application/x-www-form-urlencoded", true, false);
     }
 
@@ -598,7 +602,7 @@ public class OsmApi extends OsmConnection {
             //
             monitor.indeterminateSubTask(
                     trn("Uploading {0} object...", "Uploading {0} objects...", list.size(), list.size()));
-            String diffUploadResponse = sendPostRequest("changeset/" + changeset.getId() + "/upload", diffUploadRequest, monitor);
+            String diffUploadResponse = sendPostRequest(CHANGESET_SLASH + changeset.getId() + "/upload", diffUploadRequest, monitor);
 
             // Process the response from the server
             //
@@ -652,8 +656,7 @@ public class OsmApi extends OsmConnection {
      * @since 6349
      */
     public static boolean isUsingOAuth() {
-        return isUsingOAuth(OAuthVersion.OAuth10a)
-                || isUsingOAuth(OAuthVersion.OAuth20)
+        return isUsingOAuth(OAuthVersion.OAuth20)
                 || isUsingOAuth(OAuthVersion.OAuth21);
     }
 
@@ -664,10 +667,8 @@ public class OsmApi extends OsmConnection {
      * @since 18650
      */
     public static boolean isUsingOAuth(OAuthVersion version) {
-        if (version == OAuthVersion.OAuth10a) {
-            return "oauth".equalsIgnoreCase(getAuthMethod());
-        } else if (version == OAuthVersion.OAuth20 || version == OAuthVersion.OAuth21) {
-            return "oauth20".equalsIgnoreCase(getAuthMethod());
+        if (version == OAuthVersion.OAuth20 || version == OAuthVersion.OAuth21) {
+            return getAuthMethodVersion() == OAuthVersion.OAuth20 || getAuthMethodVersion() == OAuthVersion.OAuth21;
         }
         return false;
     }
@@ -679,9 +680,6 @@ public class OsmApi extends OsmConnection {
      */
     public static boolean isUsingOAuthAndOAuthSetUp(OsmApi api) {
         if (OsmApi.isUsingOAuth()) {
-            if (OsmApi.isUsingOAuth(OAuthVersion.OAuth10a)) {
-                return OAuthAccessTokenHolder.getInstance().containsAccessToken();
-            }
             if (OsmApi.isUsingOAuth(OAuthVersion.OAuth20)) {
                 return OAuthAccessTokenHolder.getInstance().getAccessToken(api.getBaseUrl(), OAuthVersion.OAuth20) != null;
             }
@@ -697,24 +695,23 @@ public class OsmApi extends OsmConnection {
      * @return the authentication method
      */
     public static String getAuthMethod() {
-        setCurrentAuthMethod();
         return Config.getPref().get("osm-server.auth-method", "oauth20");
     }
 
     /**
-     * This is a compatibility method for users who currently use OAuth 1.0 -- we are changing the default from oauth to oauth20,
-     * but since oauth was the default, pre-existing users will suddenly be switched to oauth20.
-     * This should be removed whenever {@link OAuthVersion#OAuth10a} support is removed.
+     * Returns the authentication method set in the preferences
+     * @return the authentication method
+     * @since 18991
      */
-    private static void setCurrentAuthMethod() {
-        if (!oauthCompatibilitySwitch) {
-            oauthCompatibilitySwitch = true;
-            final String prefKey = "osm-server.auth-method";
-            if ("oauth20".equals(Config.getPref().get(prefKey, "oauth20"))
-                && !isUsingOAuthAndOAuthSetUp(OsmApi.getOsmApi())
-                && OAuthAccessTokenHolder.getInstance().containsAccessToken()) {
-                Config.getPref().put(prefKey, "oauth");
-            }
+    @Nullable
+    public static OAuthVersion getAuthMethodVersion() {
+        switch (getAuthMethod()) {
+            case "oauth20": return OAuthVersion.OAuth20;
+            case "oauth21": return OAuthVersion.OAuth21;
+            case "basic": return null;
+            default:
+                Config.getPref().put("osm-server.auth-method", null);
+                return getAuthMethodVersion();
         }
     }
 
@@ -815,7 +812,7 @@ public class OsmApi extends OsmConnection {
 
                 errorHeader = errorHeader == null ? null : errorHeader.trim();
                 String errorBody = responseBody.isEmpty() ? null : responseBody.trim();
-                switch(retCode) {
+                switch (retCode) {
                 case HttpURLConnection.HTTP_OK:
                     return responseBody;
                 case HttpURLConnection.HTTP_GONE:
@@ -899,7 +896,7 @@ public class OsmApi extends OsmConnection {
             return;
         }
         if (changeset.getId() <= 0)
-            throw new IllegalArgumentException(tr("Changeset ID > 0 expected. Got {0}.", changeset.getId()));
+            throw new IllegalArgumentException(tr(ERROR_MESSAGE, changeset.getId()));
         if (!changeset.isOpen())
             throw new IllegalArgumentException(tr("Open changeset expected. Got closed changeset with id {0}.", changeset.getId()));
         this.changeset = changeset;
@@ -960,8 +957,8 @@ public class OsmApi extends OsmConnection {
         StringBuilder urlBuilder = noteStringBuilder(note)
             .append("/close");
         if (!encodedMessage.trim().isEmpty()) {
-            urlBuilder.append("?text=");
-            urlBuilder.append(encodedMessage);
+            urlBuilder.append("?text=")
+                    .append(encodedMessage);
         }
 
         return parseSingleNote(sendPostRequest(urlBuilder.toString(), null, monitor));
@@ -981,8 +978,8 @@ public class OsmApi extends OsmConnection {
         StringBuilder urlBuilder = noteStringBuilder(note)
             .append("/reopen");
         if (!encodedMessage.trim().isEmpty()) {
-            urlBuilder.append("?text=");
-            urlBuilder.append(encodedMessage);
+            urlBuilder.append("?text=")
+                    .append(encodedMessage);
         }
 
         return parseSingleNote(sendPostRequest(urlBuilder.toString(), null, monitor));

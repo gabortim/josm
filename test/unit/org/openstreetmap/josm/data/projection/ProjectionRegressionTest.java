@@ -1,6 +1,8 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.data.projection;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -18,7 +20,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.openstreetmap.josm.JOSMFixture;
 import org.openstreetmap.josm.data.Bounds;
@@ -26,8 +27,6 @@ import org.openstreetmap.josm.data.coor.EastNorth;
 import org.openstreetmap.josm.data.coor.LatLon;
 import org.openstreetmap.josm.testutils.annotations.ProjectionNadGrids;
 import org.openstreetmap.josm.tools.Pair;
-import org.openstreetmap.josm.tools.Platform;
-import org.openstreetmap.josm.tools.Utils;
 
 /**
  * This test is used to monitor changes in projection code.
@@ -44,7 +43,7 @@ class ProjectionRegressionTest {
 
     private static final String PROJECTION_DATA_FILE = "nodist/data/projection/projection-regression-test-data";
 
-    private static class TestData {
+    private static final class TestData {
         public String code;
         public LatLon ll;
         public EastNorth en;
@@ -141,11 +140,6 @@ class ProjectionRegressionTest {
     @ProjectionNadGrids
     @Test
     void testNonRegression() throws IOException {
-        // Disable on Github Windows runners + Java 8, minor differences appeared around 2021-07-20
-        Assumptions.assumeFalse(
-                Utils.getJavaVersion() == 8
-                && Platform.determinePlatform() == Platform.WINDOWS
-                && System.getenv("GITHUB_WORKFLOW") != null);
         List<TestData> allData = readData();
         Set<String> dataCodes = allData.stream().map(data -> data.code).collect(Collectors.toSet());
 
@@ -157,7 +151,6 @@ class ProjectionRegressionTest {
              }
         }
 
-        final boolean java9 = Utils.getJavaVersion() >= 9;
         for (TestData data : allData) {
             Projection proj = Projections.getProjectionByCode(data.code);
             if (proj == null) {
@@ -166,14 +159,14 @@ class ProjectionRegressionTest {
             }
             EastNorth en = proj.latlon2eastNorth(data.ll);
             LatLon ll2 = proj.eastNorth2latlon(data.en);
-            if (!(java9 ? equalsJava9(en, data.en) : en.equals(data.en))) {
+            if (!equalsJava9(en, data.en)) {
                 String error = String.format("%s (%s): Projecting latlon(%s,%s):%n" +
                         "        expected: eastnorth(%s,%s),%n" +
                         "        but got:  eastnorth(%s,%s)!%n",
                         proj, data.code, data.ll.lat(), data.ll.lon(), data.en.east(), data.en.north(), en.east(), en.north());
                 fail.append(error);
             }
-            if (!(java9 ? equalsJava9(ll2, data.ll2) : ll2.equals(data.ll2))) {
+            if (!equalsJava9(ll2, data.ll2)) {
                 String error = String.format("%s (%s): Inverse projecting eastnorth(%s,%s):%n" +
                         "        expected: latlon(%s,%s),%n" +
                         "        but got:  latlon(%s,%s)!%n",
@@ -184,7 +177,7 @@ class ProjectionRegressionTest {
 
         if (fail.length() > 0) {
             System.err.println(fail);
-            throw new AssertionError(fail.toString());
+            fail(fail.toString());
         }
     }
 

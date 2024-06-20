@@ -197,7 +197,7 @@ public class TMSCachedTileLoaderJob extends JCSCachedTileLoaderJob<String, Buffe
                 }
             }
 
-            switch(result) {
+            switch (result) {
             case SUCCESS:
                 handleNoTileAtZoom();
                 if (attributes != null) {

@@ -49,7 +49,7 @@ public class DataSetMerger {
 
     /**
      * constructor
-     *
+     * <p>
      * The visitor will merge <code>sourceDataSet</code> onto <code>targetDataSet</code>
      *
      * @param targetDataSet dataset with my primitives. Must not be null.
@@ -68,11 +68,11 @@ public class DataSetMerger {
 
     /**
      * Merges a primitive onto primitives dataset.
-     *
+     * <p>
      * If other.id != 0 it tries to merge it with an corresponding primitive from
      * my dataset with the same id. If this is not possible a conflict is remembered
      * in {@link #conflicts}.
-     *
+     * <p>
      * If other.id == 0 (new primitive) it tries to find a primitive in my dataset with id == 0 which
      * is semantically equal. If it finds one it merges its technical attributes onto
      * my primitive.
@@ -114,7 +114,7 @@ public class DataSetMerger {
         // the target dataset. Create a clone and add it to the target dataset.
         //
         OsmPrimitive target;
-        switch(source.getType()) {
+        switch (source.getType()) {
         case NODE: target = source.isNew() ? new Node() : new Node(source.getId()); break;
         case WAY: target = source.isNew() ? new Way() : new Way(source.getId()); break;
         case RELATION: target = source.isNew() ? new Relation() : new Relation(source.getId()); break;
@@ -238,7 +238,7 @@ public class DataSetMerger {
             if (targetNode != null) {
                 newNodes.add(targetNode);
                 if (targetNode.isDeleted() && !conflicts.hasConflictForMy(targetNode)) {
-                    addConflict(new Conflict<OsmPrimitive>(targetNode, sourceNode, true));
+                    addConflict(new Conflict<>(targetNode, sourceNode, true));
                     targetNode.setDeleted(false);
                 }
             } else
@@ -369,7 +369,11 @@ public class DataSetMerger {
             mergeFromSource = true;
         }
         if (mergeFromSource) {
+            boolean backupReferrersDownloadedStatus = target.isReferrersDownloaded() && haveSameVersion;
             target.mergeFrom(source);
+            if (backupReferrersDownloadedStatus && !target.isReferrersDownloaded()) {
+                target.setReferrersDownloaded(true);
+            }
             objectsWithChildrenToMerge.add(source.getPrimitiveId());
         }
         return true;
@@ -378,7 +382,7 @@ public class DataSetMerger {
     /**
      * Runs the merge operation. Successfully merged {@link OsmPrimitive}s are in
      * {@link #getTargetDataSet()}.
-     *
+     * <p>
      * See {@link #getConflicts()} for a map of conflicts after the merge operation.
      */
     public void merge() {
@@ -388,7 +392,7 @@ public class DataSetMerger {
     /**
      * Runs the merge operation. Successfully merged {@link OsmPrimitive}s are in
      * {@link #getTargetDataSet()}.
-     *
+     * <p>
      * See {@link #getConflicts()} for a map of conflicts after the merge operation.
      * @param progressMonitor The progress monitor
      */
@@ -399,7 +403,7 @@ public class DataSetMerger {
     /**
      * Runs the merge operation. Successfully merged {@link OsmPrimitive}s are in
      * {@link #getTargetDataSet()}.
-     *
+     * <p>
      * See {@link #getConflicts()} for a map of conflicts after the merge operation.
      * @param progressMonitor The progress monitor
      * @param mergeBounds Whether or not to merge the bounds of the new DataSet to

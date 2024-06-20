@@ -1,19 +1,23 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.tools;
 
+import static org.openstreetmap.josm.tools.I18n.tr;
+
 import java.awt.GraphicsEnvironment;
 import java.awt.Toolkit;
-import java.awt.event.KeyEvent;
+import java.awt.event.InputEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -34,7 +38,7 @@ public interface PlatformHook {
     /**
      * Visitor to construct a PlatformHook from a given {@link Platform} object.
      */
-    PlatformVisitor<PlatformHook> CONSTRUCT_FROM_PLATFORM = new PlatformVisitor<PlatformHook>() {
+    PlatformVisitor<PlatformHook> CONSTRUCT_FROM_PLATFORM = new PlatformVisitor<>() {
         @Override
         public PlatformHook visitUnixoid() {
             return new PlatformHookUnixoid();
@@ -60,7 +64,7 @@ public interface PlatformHook {
     /**
       * The preStartupHook will be called extremely early. It is
       * guaranteed to be called before the GUI setup has started.
-      *
+      * <p>
       * Reason: On OSX we need to inform the Swing libraries
       * that we want to be integrated with the OS before we setup our GUI.
       */
@@ -79,21 +83,21 @@ public interface PlatformHook {
     }
 
     /**
-      * The startupHook will be called early, but after the GUI
-      * setup has started.
-      *
-      * Reason: On OSX we need to register some callbacks with the
-      * OS, so we'll receive events from the system menu.
-      * @param javaCallback Java expiration callback, providing GUI feedback
-      * @param webStartCallback WebStart migration callback, providing GUI feedback
-      * @since 17679 (signature)
-      */
-    default void startupHook(JavaExpirationCallback javaCallback, WebStartMigrationCallback webStartCallback) {
-        // Do nothing
+     * The startupHook will be called early, but after the GUI
+     * setup has started.
+     * <p>
+     * Reason: On OSX we need to register some callbacks with the
+     * OS, so we'll receive events from the system menu.
+     * @param javaCallback Java expiration callback, providing GUI feedback
+     * @param sanityCheckCallback Sanity check callback, providing GUI feedback
+     * @since 18985
+     */
+    default void startupHook(JavaExpirationCallback javaCallback, SanityCheckCallback sanityCheckCallback) {
+        startupSanityChecks(sanityCheckCallback);
     }
 
     /**
-      * The openURL hook will be used to open an URL in the
+      * The openURL hook will be used to open a URL in the
       * default web browser.
      * @param url The URL to open
      * @throws IOException if any I/O error occurs
@@ -105,17 +109,17 @@ public interface PlatformHook {
       * Shortcut class after the modifier groups have been read
       * from the config, but before any shortcuts are read from
       * it or registered from within the application.
-      *
+      * <p>
       * Please note that you are not allowed to register any
       * shortcuts from this hook, but only "systemCuts"!
-      *
+      * <p>
       * BTW: SystemCuts should be named "system:&lt;whatever&gt;",
       * and it'd be best if you'd recycle the names already used
-      * by the Windows and OSX hooks. Especially the later has
+      * by the Windows and OSX hooks. Especially the latter has
       * really many of them.
-      *
+      * <p>
       * You should also register any and all shortcuts that the
-      * operation system handles itself to block JOSM from trying
+      * operating system handles itself to block JOSM from trying
       * to use them---as that would just not work. Call setAutomatic
       * on them to prevent the keyboard preferences from allowing the
       * user to change them.
@@ -254,7 +258,7 @@ public interface PlatformHook {
      */
     default int getMenuShortcutKeyMaskEx() {
         // To remove when switching to Java 10+, and use Toolkit.getMenuShortcutKeyMaskEx instead
-        return KeyEvent.CTRL_DOWN_MASK;
+        return InputEvent.CTRL_DOWN_MASK;
     }
 
     /**
@@ -274,16 +278,17 @@ public interface PlatformHook {
     }
 
     /**
-     * Called when Oracle Java WebStart is detected at startup.
-     * @since 17679
+     * Inform the user that a sanity check or checks failed
      */
     @FunctionalInterface
-    interface WebStartMigrationCallback {
+    interface SanityCheckCallback {
         /**
-         * Asks user to migrate to OpenWebStart.
-         * @param url download URL
+         * Tells the user that a sanity check failed
+         * @param title The title of the message to show
+         * @param canContinue {@code true} if the failed sanity check(s) will not instantly kill JOSM when the user edits
+         * @param message The message parts to show the user (as a list)
          */
-        void askMigrateWebStart(String url);
+        void sanityCheckFailed(String title, boolean canContinue, String... message);
     }
 
     /**
@@ -331,7 +336,7 @@ public interface PlatformHook {
      * @since 18580
      */
     default String getJavaUrl() {
-        StringBuilder defaultDownloadUrl = new StringBuilder("https://www.azul.com/downloads/?version=java-17-lts");
+        StringBuilder defaultDownloadUrl = new StringBuilder("https://www.azul.com/downloads/?version=java-21-lts");
         if (PlatformManager.isPlatformWindows()) {
             defaultDownloadUrl.append("&os=windows");
         } else if (PlatformManager.isPlatformOsx()) {
@@ -359,13 +364,53 @@ public interface PlatformHook {
     }
 
     /**
-     * Checks if we run Oracle Web Start, proposes to user to migrate to OpenWebStart.
-     * @param callback WebStart migration callback
-     * @since 17679
+     * Check startup preconditions
+     * @param sanityCheckCallback The callback to inform the user about failed checks
      */
-    default void checkWebStartMigration(WebStartMigrationCallback callback) {
-        if (Utils.isRunningJavaWebStart()) {
-            callback.askMigrateWebStart(Config.getPref().get("openwebstart.download.url", "https://openwebstart.com/download/"));
+    default void startupSanityChecks(SanityCheckCallback sanityCheckCallback) {
+        final String arch = System.getProperty("os.arch");
+        final List<String> messages = new ArrayList<>();
+        final String jvmArch = System.getProperty("sun.arch.data.model");
+        boolean canContinue = true;
+        if (Utils.getJavaVersion() < 11) {
+            canContinue = false;
+            messages.add(tr("You must update Java to Java {0} or later in order to run this version of JOSM", 17));
+            // Reset webstart/java update prompts
+            Config.getPref().put("askUpdateWebStart", null);
+            Config.getPref().put("askUpdateJava" + Utils.getJavaLatestVersion(), null);
+            Config.getPref().put("askUpdateJavalatest", null);
+        }
+        if (!"x86".equals(arch) && "32".equals(jvmArch)) {
+            messages.add(tr("Please use a 64 bit version of Java -- this will avoid out of memory errors"));
+        }
+        // Note: these might be able to be removed with the appropriate module-info.java settings.
+        final String[] expectedJvmArguments = {
+                "--add-exports=java.base/sun.security.action=ALL-UNNAMED",
+                "--add-exports=java.desktop/com.sun.imageio.plugins.jpeg=ALL-UNNAMED",
+                "--add-exports=java.desktop/com.sun.imageio.spi=ALL-UNNAMED"
+        };
+        final List<String> vmArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
+        final StringBuilder missingArguments = new StringBuilder();
+        for (String arg : expectedJvmArguments) {
+            if (vmArguments.stream().noneMatch(s -> s.contains(arg))) {
+                if (missingArguments.length() > 0) {
+                    missingArguments.append("<br>");
+                }
+                missingArguments.append(arg);
+            }
+        }
+        if (missingArguments.length() > 0) {
+            final String args = missingArguments.toString();
+            messages.add(tr("Missing JVM Arguments:<br>{0}<br>These arguments should be added in the command line or start script before the -jar parameter.", args));
+        }
+        if (!messages.isEmpty()) {
+            if (canContinue) {
+                sanityCheckCallback.sanityCheckFailed(tr("JOSM may work improperly"), true,
+                        messages.toArray(new String[0]));
+            } else {
+                sanityCheckCallback.sanityCheckFailed(tr("JOSM will be unable to work properly and will exit"), false,
+                        messages.toArray(new String[0]));
+            }
         }
     }
 

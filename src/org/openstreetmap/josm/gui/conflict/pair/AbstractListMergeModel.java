@@ -64,7 +64,7 @@ import org.openstreetmap.josm.tools.Utils;
  * A ListMergeModel can be ''frozen''. If it's frozen, it doesn't accept additional merge
  * decisions. {@link PropertyChangeListener}s can register for property value changes of
  * {@link #FROZEN_PROP}.
- *
+ * <p>
  * ListMergeModel is an abstract class. Three methods have to be implemented by subclasses:
  * <ul>
  *   <li>{@link AbstractListMergeModel#cloneEntryForMergedList} - clones an entry of type T</li>
@@ -202,7 +202,7 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
     protected AbstractListMergeModel() {
         entries = new EnumMap<>(ListRole.class);
         for (ListRole role : ListRole.values()) {
-            entries.put(role, new ArrayList<T>());
+            entries.put(role, new ArrayList<>());
         }
 
         buildMyEntriesTableModel();
@@ -355,6 +355,9 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
         copyToEnd(THEIR_ENTRIES, rows);
     }
 
+    /**
+     * Clear the merged list.
+     */
     public void clearMerged() {
         getMergedEntries().clear();
         fireModelDataChanged();
@@ -375,14 +378,13 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
         if (deletedIds.size() > MAX_DELETED_PRIMITIVE_IN_DIALOG) {
             items.add(tr("{0} more...", deletedIds.size() - MAX_DELETED_PRIMITIVE_IN_DIALOG));
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append("<html>")
-          .append(tr("The following objects could not be copied to the target object<br>because they are deleted in the target dataset:"))
-          .append(Utils.joinAsHtmlUnorderedList(items))
-          .append("</html>");
+        String sb = "<html>" +
+                tr("The following objects could not be copied to the target object<br>because they are deleted in the target dataset:") +
+                Utils.joinAsHtmlUnorderedList(items) +
+                "</html>";
         HelpAwareOptionPane.showOptionDialog(
                 MainApplication.getMainFrame(),
-                sb.toString(),
+                sb,
                 tr("Merging deleted objects failed"),
                 JOptionPane.WARNING_MESSAGE,
                 HelpUtil.ht("/Dialog/Conflict#MergingDeletedPrimitivesFailed")
@@ -581,7 +583,7 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
     /**
      * This an adapter between a {@link JTable} and one of the three entry lists
      * in the role {@link ListRole} managed by the {@link AbstractListMergeModel}.
-     *
+     * <p>
      * From the point of view of the {@link JTable} it is a {@link TableModel}.
      *
      * @see AbstractListMergeModel#getMyTableModel()
@@ -592,7 +594,7 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
         private final ListRole role;
 
         /**
-         *
+         * Create a new {@link EntriesTableModel}
          * @param role the role
          */
         public EntriesTableModel(ListRole role) {
@@ -730,7 +732,7 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
     /**
      * This is the selection model to be used in a {@link JTable} which displays
      * an entry list managed by {@link AbstractListMergeModel}.
-     *
+     * <p>
      * The model ensures that only rows displaying an entry in the entry list
      * can be selected. "Empty" rows can't be selected.
      *
@@ -831,6 +833,9 @@ public abstract class AbstractListMergeModel<T extends PrimitiveId, C extends Co
         return this.comparePairListModel;
     }
 
+    /**
+     * A model for {@link ComparePairType} with the enums added as options.
+     */
     public class ComparePairListModel extends JosmComboBoxModel<ComparePairType> {
 
         private int selectedIdx;

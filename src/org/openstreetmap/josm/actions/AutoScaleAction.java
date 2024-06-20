@@ -438,7 +438,7 @@ public class AutoScaleAction extends JosmAction {
     /**
      * Adapter for zoom change events
      */
-    private class ZoomChangeAdapter implements ZoomChangeListener {
+    private final class ZoomChangeAdapter implements ZoomChangeListener {
         @Override
         public void zoomChanged() {
             updateEnabledState();

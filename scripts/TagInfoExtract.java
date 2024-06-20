@@ -1,4 +1,5 @@
 // License: GPL. For details, see LICENSE file.
+
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -31,11 +32,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
-import jakarta.json.Json;
-import jakarta.json.JsonArrayBuilder;
-import jakarta.json.JsonObjectBuilder;
-import jakarta.json.JsonWriter;
-import jakarta.json.stream.JsonGenerator;
 
 import org.openstreetmap.josm.actions.DeleteAction;
 import org.openstreetmap.josm.command.DeleteCommand;
@@ -84,6 +80,12 @@ import org.openstreetmap.josm.tools.Territories;
 import org.openstreetmap.josm.tools.Utils;
 import org.xml.sax.SAXException;
 
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonWriter;
+import jakarta.json.stream.JsonGenerator;
+
 /**
  * Extracts tag information for the taginfo project.
  * <p>
@@ -100,9 +102,12 @@ public class TagInfoExtract {
     /**
      * Main method.
      * @param args Main program arguments
-     * @throws Exception if any error occurs
+     * @throws IOException if an IO exception occurs
+     * @throws OsmTransferException if something happened when communicating with the OSM server
+     * @throws ParseException if there was an issue parsing MapCSS
+     * @throws SAXException if there was an issue parsing XML
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException, OsmTransferException, ParseException, SAXException {
         HttpClient.setFactory(Http1Client::new);
         TagInfoExtract script = new TagInfoExtract();
         script.parseCommandLineArguments(args);
@@ -162,7 +167,7 @@ public class TagInfoExtract {
         System.exit(0);
     }
 
-    private static class Options {
+    private static final class Options {
         Mode mode;
         int josmSvnRevision = Version.getInstance().getVersion();
         Path baseDir = Paths.get("");
@@ -221,7 +226,7 @@ public class TagInfoExtract {
     }
 
     private abstract class Extractor {
-        abstract void run() throws Exception;
+        abstract void run() throws IOException, OsmTransferException, ParseException, SAXException;
 
         void writeJson(String name, String description, Iterable<TagInfoTag> tags) throws IOException {
             try (Writer writer = options.outputFile != null ? Files.newBufferedWriter(options.outputFile) : new StringWriter();
@@ -313,7 +318,7 @@ public class TagInfoExtract {
         }
     }
 
-    private class ExternalPresets extends Presets {
+    private final class ExternalPresets extends Presets {
 
         @Override
         void run() throws IOException, OsmTransferException, SAXException {
@@ -340,7 +345,7 @@ public class TagInfoExtract {
         }
     }
 
-    private class StyleSheet extends Extractor {
+    private final class StyleSheet extends Extractor {
         private MapCSSStyleSource styleSource;
 
         @Override

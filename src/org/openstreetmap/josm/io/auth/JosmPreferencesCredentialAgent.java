@@ -10,20 +10,20 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
-import jakarta.json.JsonException;
 import javax.swing.text.html.HTMLEditorKit;
 
 import org.openstreetmap.josm.data.oauth.IOAuthToken;
 import org.openstreetmap.josm.data.oauth.OAuth20Exception;
 import org.openstreetmap.josm.data.oauth.OAuth20Parameters;
 import org.openstreetmap.josm.data.oauth.OAuth20Token;
-import org.openstreetmap.josm.data.oauth.OAuthToken;
 import org.openstreetmap.josm.data.oauth.OAuthVersion;
 import org.openstreetmap.josm.gui.widgets.HtmlPanel;
 import org.openstreetmap.josm.io.DefaultProxySelector;
 import org.openstreetmap.josm.io.OsmApi;
 import org.openstreetmap.josm.spi.preferences.Config;
 import org.openstreetmap.josm.tools.Utils;
+
+import jakarta.json.JsonException;
 
 /**
  * This is the default credentials agent in JOSM. It keeps username and password for both
@@ -41,7 +41,7 @@ public class JosmPreferencesCredentialAgent extends AbstractCredentialsAgent {
             return null;
         String user;
         String password;
-        switch(requestorType) {
+        switch (requestorType) {
         case SERVER:
             if (Objects.equals(OsmApi.getOsmApi().getHost(), host)) {
                 user = Config.getPref().get("osm-server.username", null);
@@ -73,7 +73,7 @@ public class JosmPreferencesCredentialAgent extends AbstractCredentialsAgent {
     public void store(RequestorType requestorType, String host, PasswordAuthentication credentials) throws CredentialsAgentException {
         if (requestorType == null)
             return;
-        switch(requestorType) {
+        switch (requestorType) {
         case SERVER:
             if (Objects.equals(OsmApi.getOsmApi().getHost(), host)) {
                 Config.getPref().put("osm-server.username", credentials.getUserName());
@@ -102,22 +102,6 @@ public class JosmPreferencesCredentialAgent extends AbstractCredentialsAgent {
         }
     }
 
-    /**
-     * Lookup the current OAuth Access Token to access the OSM server. Replies null, if no
-     * Access Token is currently managed by this CredentialManager.
-     *
-     * @return the current OAuth Access Token to access the OSM server.
-     * @throws CredentialsAgentException if something goes wrong
-     */
-    @Override
-    public OAuthToken lookupOAuthAccessToken() throws CredentialsAgentException {
-        String accessTokenKey = Config.getPref().get("oauth.access-token.key", null);
-        String accessTokenSecret = Config.getPref().get("oauth.access-token.secret", null);
-        if (accessTokenKey == null && accessTokenSecret == null)
-            return null;
-        return new OAuthToken(accessTokenKey, accessTokenSecret);
-    }
-
     @Override
     public IOAuthToken lookupOAuthAccessToken(String host) throws CredentialsAgentException {
         Set<String> keySet = new HashSet<>(Config.getPref().getKeySet());
@@ -130,7 +114,7 @@ public class JosmPreferencesCredentialAgent extends AbstractCredentialsAgent {
             }
             String token = Config.getPref().get(hostKey, null);
             String parameters = Config.getPref().get(parametersKey, null);
-            if (!Utils.isBlank(token) && !Utils.isBlank(parameters) && OAuthVersion.OAuth20 == oauthType) {
+            if (!Utils.isStripEmpty(token) && !Utils.isStripEmpty(parameters) && OAuthVersion.OAuth20 == oauthType) {
                 try {
                     OAuth20Parameters oAuth20Parameters = new OAuth20Parameters(parameters);
                     return new OAuth20Token(oAuth20Parameters, token);
@@ -140,23 +124,6 @@ public class JosmPreferencesCredentialAgent extends AbstractCredentialsAgent {
             }
         }
         return null;
-    }
-
-    /**
-     * Stores the OAuth Access Token <code>accessToken</code>.
-     *
-     * @param accessToken the access Token. null, to remove the Access Token.
-     * @throws CredentialsAgentException if something goes wrong
-     */
-    @Override
-    public void storeOAuthAccessToken(OAuthToken accessToken) throws CredentialsAgentException {
-        if (accessToken == null) {
-            Config.getPref().put("oauth.access-token.key", null);
-            Config.getPref().put("oauth.access-token.secret", null);
-        } else {
-            Config.getPref().put("oauth.access-token.key", accessToken.getKey());
-            Config.getPref().put("oauth.access-token.secret", accessToken.getSecret());
-        }
     }
 
     @Override

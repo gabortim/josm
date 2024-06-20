@@ -1,6 +1,8 @@
 // License: GPL. For details, see LICENSE file.
 package org.openstreetmap.josm.gui;
 
+import static java.util.function.Predicate.not;
+
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -121,10 +123,10 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
      * @author Michael Zangl
      * @since 10271
      */
-    private class LayerInvalidatedListener implements PaintableInvalidationListener {
+    private final class LayerInvalidatedListener implements PaintableInvalidationListener {
         private boolean ignoreRepaint;
 
-        private final Set<MapViewPaintable> invalidatedLayers = Collections.newSetFromMap(new IdentityHashMap<MapViewPaintable, Boolean>());
+        private final Set<MapViewPaintable> invalidatedLayers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         @Override
         public void paintableInvalidated(PaintableInvalidationEvent event) {
@@ -161,7 +163,7 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
         /**
          * Attempts to trace repaints that did not originate from this listener. Good to find missed {@link MapView#repaint()}s in code.
          */
-        protected synchronized void traceRandomRepaint() {
+        private synchronized void traceRandomRepaint() {
             if (!ignoreRepaint) {
                 Logging.trace("Repaint: {0} from {1}", Thread.currentThread().getStackTrace()[3], Thread.currentThread());
             }
@@ -172,8 +174,8 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
          * Retrieves a set of all layers that have been marked as invalid since the last call to this method.
          * @return The layers
          */
-        protected synchronized Set<MapViewPaintable> collectInvalidatedLayers() {
-            Set<MapViewPaintable> layers = Collections.newSetFromMap(new IdentityHashMap<MapViewPaintable, Boolean>());
+        private synchronized Set<MapViewPaintable> collectInvalidatedLayers() {
+            Set<MapViewPaintable> layers = Collections.newSetFromMap(new IdentityHashMap<>());
             layers.addAll(invalidatedLayers);
             invalidatedLayers.clear();
             return layers;
@@ -296,7 +298,7 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
             }
         });
 
-        setFocusTraversalKeysEnabled(!Shortcut.findShortcut(KeyEvent.VK_TAB, 0).isPresent());
+        setFocusTraversalKeysEnabled(Shortcut.findShortcut(KeyEvent.VK_TAB, 0).isEmpty());
 
         mapNavigationComponents = getMapNavigationComponents(this);
         for (JComponent c : mapNavigationComponents) {
@@ -318,7 +320,7 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
         Dimension size = zoomSlider.getPreferredSize();
         zoomSlider.setSize(size);
         zoomSlider.setLocation(3, 0);
-        zoomSlider.setFocusTraversalKeysEnabled(!Shortcut.findShortcut(KeyEvent.VK_TAB, 0).isPresent());
+        zoomSlider.setFocusTraversalKeysEnabled(Shortcut.findShortcut(KeyEvent.VK_TAB, 0).isEmpty());
 
         MapScaler scaler = new MapScaler(forMapView);
         scaler.setPreferredLineLength(size.width - 10);
@@ -826,8 +828,9 @@ LayerManager.LayerChangeListener, MainLayerManager.ActiveLayerChangeListener {
      */
     public String getLayerInformationForSourceTag() {
         return layerManager.getVisibleLayersInZOrder().stream()
-                .filter(layer -> !Utils.isBlank(layer.getChangesetSourceTag()))
-                .map(layer -> layer.getChangesetSourceTag().trim())
+                .map(Layer::getChangesetSourceTag)
+                .filter(not(Utils::isStripEmpty))
+                .map(String::trim)
                 .distinct()
                 .collect(Collectors.joining("; "));
     }

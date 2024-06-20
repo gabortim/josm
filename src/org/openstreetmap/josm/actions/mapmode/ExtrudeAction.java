@@ -38,7 +38,6 @@ import org.openstreetmap.josm.data.Bounds;
 import org.openstreetmap.josm.data.UndoRedoHandler;
 import org.openstreetmap.josm.data.coor.EastNorth;
 import org.openstreetmap.josm.data.coor.ILatLon;
-import org.openstreetmap.josm.data.osm.DataIntegrityProblemException;
 import org.openstreetmap.josm.data.osm.DataSet;
 import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.OsmPrimitive;
@@ -81,6 +80,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
     private long mouseDownTime;
     private transient WaySegment selectedSegment;
     private transient Node selectedNode;
+    private transient Command lastCommandOnUndoStack;
     private Color mainColor;
     private transient Stroke mainStroke;
 
@@ -331,6 +331,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
         map.keyDetector.removeModifierExListener(this);
         this.selectedNode = null;
         this.selectedSegment = null;
+        this.lastCommandOnUndoStack = null;
         super.exitMode();
     }
 
@@ -388,7 +389,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
         MapFrame map = MainApplication.getMap();
         if (!map.mapView.isActiveLayerVisible())
             return;
-        if (!(Boolean) this.getValue("active"))
+        if (Boolean.FALSE.equals(this.getValue("active")))
             return;
         if (e.getButton() != MouseEvent.BUTTON1)
             return;
@@ -401,6 +402,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
 
         // If nothing gets caught, stay in select mode
         if (selectedSegment == null && selectedNode == null) return;
+        lastCommandOnUndoStack = UndoRedoHandler.getInstance().getLastCommand();
 
         if (selectedNode != null) {
             if (ctrl || nodeDragWithoutCtrl) {
@@ -509,7 +511,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
                     //move nodes to new position
                     if (moveCommand == null) {
                         //make a new move command
-                        moveCommand = new MoveCommand(new ArrayList<OsmPrimitive>(movingNodeList), bestMovement);
+                        moveCommand = new MoveCommand(new ArrayList<>(movingNodeList), bestMovement);
                         UndoRedoHandler.getInstance().add(moveCommand);
                     } else {
                         //reuse existing move command
@@ -545,13 +547,8 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
                     // double click adds a new node
                     addNewNode(e);
                 } else if (e.getPoint().distance(initialMousePos) > initialMoveThreshold && newN1en != null && selectedSegment != null) {
-                    try {
-                        // main extrusion commands
-                        performExtrusion();
-                    } catch (DataIntegrityProblemException ex) {
-                        // Can occur if calling undo while extruding, see #12870
-                        Logging.error(ex);
-                    }
+                    // main extrusion commands
+                    performExtrusion();
                 }
             } else if (mode == Mode.translate || mode == Mode.translate_node) {
                 //Commit translate
@@ -566,6 +563,7 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
             mapView.setNewCursor(ctrl ? cursorTranslate : alt ? cursorCreateNew : shift ? cursorCreateNodes : cursor, this);
             mapView.removeTemporaryLayer(this);
             selectedSegment = null;
+            lastCommandOnUndoStack = null;
             moveCommand = null;
             mode = Mode.select;
             dualAlignSegmentCollapsed = false;
@@ -638,7 +636,13 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
      * Uses {@link #newN1en}, {@link #newN2en} calculated by {@link #calculateBestMovementAndNewNodes}
      */
     private void performExtrusion() {
+        // sanity checks, see #23447 and #12870: don't try to extrude when user pressed undo
+        if (lastCommandOnUndoStack != UndoRedoHandler.getInstance().getLastCommand())
+            return;
         DataSet ds = getLayerManager().getEditDataSet();
+        if (ds.getPrimitiveById(selectedSegment.getWay()) == null || !selectedSegment.isUsable())
+            return;
+
         // create extrusion
         Collection<Command> cmds = new LinkedList<>();
         Way wnew = new Way(selectedSegment.getWay());
@@ -934,7 +938,8 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
      */
     private EastNorth calculateBestMovementAndNewNodes(EastNorth mouseEn) {
         EastNorth bestMovement = calculateBestMovement(mouseEn);
-        EastNorth n1movedEn = initialN1en.add(bestMovement), n2movedEn;
+        EastNorth n1movedEn = initialN1en.add(bestMovement);
+        EastNorth n2movedEn;
 
         // find out the movement distance, in metres
         double distance = ProjectionRegistry.getProjection().eastNorth2latlon(initialN1en).greatCircleDistance(
@@ -1153,7 +1158,8 @@ public class ExtrudeAction extends MapMode implements MapViewPaintable, KeyPress
         double raoffsetx = symbolSize*factor*normal.getX();
         double raoffsety = symbolSize*factor*normal.getY();
 
-        double cx = center.getX(), cy = center.getY();
+        final double cx = center.getX();
+        final double cy = center.getY();
         double k = mirror ? -1 : 1;
         Point2D ra1 = new Point2D.Double(cx + raoffsetx, cy + raoffsety);
         Point2D ra3 = new Point2D.Double(cx - raoffsety*k, cy + raoffsetx*k);

@@ -260,7 +260,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
      * This class is called when the user doesn't find the GPX file he needs in the files that have
      * been loaded yet. It displays a FileChooser dialog to select the GPX file to be loaded.
      */
-    private class LoadGpxDataActionListener implements ActionListener {
+    private final class LoadGpxDataActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -283,7 +283,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         }
     }
 
-    private class UseSupportLayerActionListener implements ActionListener {
+    private final class UseSupportLayerActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -295,7 +295,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         }
     }
 
-    private class AdvancedSettingsActionListener implements ActionListener {
+    private final class AdvancedSettingsActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -316,7 +316,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
      * Then values of timezone and delta are set.
      * @author chris
      */
-    private class SetOffsetActionListener implements ActionListener {
+    private final class SetOffsetActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -353,7 +353,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         }
     }
 
-    private static class GpxLayerAddedListener implements LayerChangeListener {
+    private static final class GpxLayerAddedListener implements LayerChangeListener {
         @Override
         public void layerAdded(LayerAddEvent e) {
             Layer layer = e.getAddedLayer();
@@ -542,7 +542,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.gridy = y++;
         panelTf.add(panelCb, gbc);
 
-        gbc = GBC.eol().fill(GBC.HORIZONTAL).insets(0, 0, 0, 12);
+        gbc = GBC.eol().fill(GridBagConstraints.HORIZONTAL).insets(0, 0, 0, 12);
         gbc.gridx = 0;
         gbc.gridy = y++;
         panelTf.add(new JSeparator(SwingConstants.HORIZONTAL), gbc);
@@ -552,7 +552,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.gridy = y;
         panelTf.add(new JLabel(tr("Timezone: ")), gbc);
 
-        gbc = GBC.std().fill(GBC.HORIZONTAL);
+        gbc = GBC.std().fill(GridBagConstraints.HORIZONTAL);
         gbc.gridx = 1;
         gbc.gridy = y++;
         gbc.weightx = 1.;
@@ -563,7 +563,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.gridy = y;
         panelTf.add(new JLabel(tr("Offset:")), gbc);
 
-        gbc = GBC.std().fill(GBC.HORIZONTAL);
+        gbc = GBC.std().fill(GridBagConstraints.HORIZONTAL);
         gbc.gridx = 1;
         gbc.gridy = y++;
         gbc.weightx = 1.;
@@ -578,7 +578,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.weightx = 0.5;
         panelTf.add(buttonViewGpsPhoto, gbc);
 
-        gbc = GBC.std().fill(GBC.BOTH).insets(5, 5, 5, 5);
+        gbc = GBC.std().fill(GridBagConstraints.BOTH).insets(5, 5, 5, 5);
         gbc.gridx = 1;
         gbc.gridy = y++;
         gbc.weightx = 0.5;
@@ -590,7 +590,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.gridx = 3;
         panelTf.add(buttonAdjust, gbc);
 
-        gbc = GBC.eol().fill(GBC.HORIZONTAL).insets(0, 12, 0, 0);
+        gbc = GBC.eol().fill(GridBagConstraints.HORIZONTAL).insets(0, 12, 0, 0);
         gbc.gridx = 0;
         gbc.gridy = y++;
         panelTf.add(new JSeparator(SwingConstants.HORIZONTAL), gbc);
@@ -615,7 +615,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         gbc.gridy = y;
         panelTf.add(cbShowThumbs, gbc);
 
-        gbc = GBC.eol().fill(GBC.HORIZONTAL).insets(0, 12, 0, 0);
+        gbc = GBC.eol().fill(GridBagConstraints.HORIZONTAL).insets(0, 12, 0, 0);
         sepDirectionPosition = new JSeparator(SwingConstants.HORIZONTAL);
         panelTf.add(sepDirectionPosition, gbc);
 
@@ -807,7 +807,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
     /**
      * Presents dialog with sliders for manual adjust.
      */
-    private class AdjustActionListener implements ActionListener {
+    private final class AdjustActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -894,7 +894,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         return GpxTimeOffset.milliseconds(firstExifDate - firstGPXDate).splitOutTimezone();
     }
 
-    private class AutoGuessActionListener implements ActionListener {
+    private final class AutoGuessActionListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -942,7 +942,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         return yLayer.getSortedImgList(cbExifImg.isSelected(), cbTaggedImg.isSelected());
     }
 
-    private GpxDataWrapper selectedGPX(boolean complain) {
+    private static GpxDataWrapper selectedGPX(boolean complain) {
         Object item = gpxModel.getSelectedItem();
 
         if (item == null || ((GpxDataWrapper) item).data == null) {
@@ -960,7 +960,7 @@ public class CorrelateGpxWithImages extends AbstractAction implements ExpertMode
         ExpertToggleAction.removeExpertModeChangeListener(this);
         if (cbGpx != null) {
             // Force the JCombobox to remove its eventListener from the static GpxDataWrapper
-            cbGpx.setModel(new DefaultComboBoxModel<GpxDataWrapper>());
+            cbGpx.setModel(new DefaultComboBoxModel<>());
             cbGpx = null;
         }
 
