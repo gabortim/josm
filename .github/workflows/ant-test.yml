@@ -79,7 +79,7 @@ jobs:
 
       - name: Publish Test Report with action-junit-report
         if: ${{ always() }}
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: 'artifacts/**/*.xml'
           token: ${{ secrets.GITHUB_TOKEN }}
