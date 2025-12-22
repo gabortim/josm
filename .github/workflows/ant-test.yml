@@ -43,7 +43,7 @@ jobs:
           java-version: ${{ matrix.java }}
 
       - name: Install Ant
-        uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
+        uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
 
       - name: Test with Ant
         run: |

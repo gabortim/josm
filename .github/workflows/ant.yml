@@ -100,7 +100,7 @@ jobs:
           architecture: x64
 
       - name: Install Ant
-        uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
+        uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
 
       - name: Optimise images
         if: ${{ runner.os == 'macos' && always() }}
