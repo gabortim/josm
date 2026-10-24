@@ -25,6 +25,7 @@ import org.xml.sax.SAXException;
  * This script generates the wiki content for <a href="https://josm.openstreetmap.de/wiki/TaggingPresets#Attributes">
  * TaggingPresets#Attributes</a>
  */
+@SuppressWarnings("PMD.NoPackage")
 public final class TaggingPresetSchemeWikiGenerator {
 
     private static Document document;

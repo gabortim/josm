@@ -29,6 +29,7 @@ import org.openstreetmap.josm.data.projection.proj.Proj;
  * Generates the list of projections by combining two sources: The list from the
  * proj.4 project and a list maintained by the JOSM team.
  */
+@SuppressWarnings("PMD.NoPackage")
 public final class BuildProjectionDefinitions {
 
     private static final String PROJ_DIR = "nodist/data/projection";

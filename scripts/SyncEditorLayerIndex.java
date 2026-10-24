@@ -78,7 +78,7 @@ import jakarta.json.JsonValue;
  * <p>
  * Add option {@code -h} to show the available command line flags.
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "PMD.NoPackage"})
 public class SyncEditorLayerIndex {
 
     private static final int MAXLEN = 140;

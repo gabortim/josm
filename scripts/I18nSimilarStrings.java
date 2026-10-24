@@ -18,6 +18,7 @@ import org.openstreetmap.josm.tools.Utils;
 /**
  * Finds similar strings in lang files to find potential duplicates in order to reduce translation workload.
  */
+@SuppressWarnings("PMD.NoPackage")
 public final class I18nSimilarStrings {
 
     private I18nSimilarStrings() {

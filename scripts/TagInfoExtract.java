@@ -96,6 +96,7 @@ import jakarta.json.stream.JsonGenerator;
  * java -cp dist/josm-custom.jar TagInfoExtract --type external_presets
  * </pre>
  */
+@SuppressWarnings("PMD.NoPackage")
 public class TagInfoExtract {
 
     /**
