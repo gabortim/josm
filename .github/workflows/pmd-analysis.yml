@@ -37,5 +37,5 @@ jobs:
 
     - uses: gabortim/JOSMPluginAction/actions/pmd@pmd-improvements
       with:
-        src: ''
         file: "pmd-josm.xml"
+        severity: "warning"
