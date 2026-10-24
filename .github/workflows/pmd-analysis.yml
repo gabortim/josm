@@ -37,4 +37,5 @@ jobs:
 
     - uses: JOSM/JOSMPluginAction/actions/pmd@v3
       with:
+        src: ''
         file: "pmd-josm.xml"
