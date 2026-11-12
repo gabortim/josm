@@ -35,6 +35,8 @@
 
     <Package
       Description="$(var.JpAppDescription)"
+      Comments="%josm-msi-comments%"
+      Keywords="Installer, JOSM, OpenStreetMap, OSM, Editor"
       Manufacturer="$(var.JpAppVendor)"
       InstallerVersion="$(var.JpInstallerVersion)"
       Compressed="$(var.JpCompressedMsi)"

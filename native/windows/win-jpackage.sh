@@ -41,6 +41,20 @@ sed -i "s?%josm-source-dir%?$(pwd)?" native/windows/main.wxs
 sed -i 's?"/c/?"c:/?g' native/windows/main.wxs
 sed -i 's?"/d/?"d:/?g' native/windows/main.wxs
 
+# Describe the bundled runtime in the MSI summary information (file properties > Details > Comments).
+# jpackage links the runtime from its own JDK, so read that JDK's release file.
+JDK_RELEASE="$(dirname "$(dirname "$(command -v jpackage)")")/release"
+release_value() {
+    sed -n "s/^$1=\"\(.*\)\"\r*$/\1/p" "$JDK_RELEASE"
+}
+MSI_COMMENTS="JOSM 1.5.$1 with Java $(release_value JAVA_RUNTIME_VERSION) ($(release_value IMPLEMENTOR) $(release_value IMPLEMENTOR_VERSION))"
+if [ -n "${JAVAFX_VERSION-}" ]
+then
+    MSI_COMMENTS="$MSI_COMMENTS and JavaFX $JAVAFX_VERSION"
+fi
+echo "MSI comments: $MSI_COMMENTS"
+sed -i "s|%josm-msi-comments%|$MSI_COMMENTS|" native/windows/main.wxs
+
 JPACKAGEOPTIONS=""
 
 echo "Building EXE and MSI"
@@ -67,6 +81,7 @@ do
     --app-version "1.5.$1" \
     --copyright "JOSM, and all its integral parts, are released under the GNU General Public License v2 or later" \
     --vendor "JOSM" \
+    --description "Java OpenStreetMap Editor" \
     --resource-dir native/windows \
     --win-upgrade-uuid 79be9cf4-6dc7-41e2-a6cd-bbfaa4c07481 \
     --win-per-user-install \
